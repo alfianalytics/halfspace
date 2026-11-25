@@ -132,6 +132,16 @@ export async function ensureHalfspaceSchema(): Promise<void> {
               updated_at TIMESTAMP DEFAULT NOW()
             );
           `);
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS halfspace.agg_player_season_liga1 (
+              season_id INT NOT NULL,
+              season_key TEXT NOT NULL,
+              player_id BIGINT NOT NULL,
+              payload JSONB NOT NULL,
+              updated_at TIMESTAMP DEFAULT NOW(),
+              PRIMARY KEY (season_id, player_id)
+            );
+          `);
 
           for (const doc of CURATED_RAG_DOCUMENTS) {
             await client.query(

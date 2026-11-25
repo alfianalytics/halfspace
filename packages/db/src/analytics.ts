@@ -1,4 +1,4 @@
-import { queryReadOnly } from "./client.js";
+import { ensureHalfspaceSchema, getPgPool, queryReadOnly } from "./client.js";
 import { searchRagDocuments } from "./client.js";
 import {
   LIGA1_TOURNAMENT_ID,
@@ -113,6 +113,23 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
   }
 
   const promise = (async () => {
+    await ensureHalfspaceSchema();
+
+    // 1. Check pre-aggregated table `halfspace.agg_player_season_liga1` first (<50ms)
+    try {
+      const aggRes = await getPgPool().query(
+        `SELECT payload FROM halfspace.agg_player_season_liga1 WHERE season_id = $1`,
+        [seasonId],
+      );
+      if (aggRes.rows.length > 50) {
+        const fromAgg = aggRes.rows.map((r) => r.payload as RawAggregatedPlayer);
+        seasonCohortCache.set(seasonKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: fromAgg });
+        return fromAgg;
+      }
+    } catch {
+      // Fallback to computing from sofascore.fact_player_x_match_stats
+    }
+
     const sql = `
     WITH player_pos_minutes AS (
       SELECT
@@ -240,6 +257,35 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
     };
   });
     seasonCohortCache.set(seasonKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: result });
+
+    // Materialize into `halfspace.agg_player_season_liga1` in background so future cold starts are instant
+    void (async () => {
+      try {
+        const client = await getPgPool().connect();
+        try {
+        const values: any[] = [];
+        const placeholders: string[] = [];
+        let pIdx = 1;
+        for (const p of result) {
+          placeholders.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}::jsonb, NOW())`);
+          values.push(seasonId, seasonKey, p.playerId, JSON.stringify(p));
+        }
+        if (placeholders.length > 0) {
+          await client.query(
+            `INSERT INTO halfspace.agg_player_season_liga1 (season_id, season_key, player_id, payload, updated_at)
+             VALUES ${placeholders.join(", ")}
+             ON CONFLICT (season_id, player_id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+            values,
+          );
+        }
+        } finally {
+          client.release();
+        }
+      } catch {
+        // ignore background materialization error
+      }
+    })();
+
     return result;
   })().finally(() => {
     seasonInFlight.delete(seasonKey);
