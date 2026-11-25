@@ -10,6 +10,7 @@ import {
 } from "@halfspace/agents";
 import {
   ensureHalfspaceSchema,
+  fetchSeasonPlayerCohort,
   getFeaturedLiga1Fixtures,
   getLastNewsSyncDate,
   memoryStore,
@@ -21,6 +22,10 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 await ensureHalfspaceSchema();
+void Promise.all([
+  fetchSeasonPlayerCohort("26/27").catch(() => []),
+  fetchSeasonPlayerCohort("25/26").catch(() => []),
+]);
 
 const app = new Hono();
 

@@ -45,7 +45,7 @@ export function getPgPool(): pg.Pool {
 export async function queryReadOnly<T extends pg.QueryResultRow = any>(
   sql: string,
   params: any[] = [],
-  timeoutMs = 8000,
+  timeoutMs = 25000,
 ): Promise<T[]> {
   const trimmed = sql.trim().replace(/;+$/, "");
   const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|COPY)\b/i;

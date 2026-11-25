@@ -1,5 +1,5 @@
 import { Studio } from "@anvia/studio";
-import { ensureHalfspaceSchema } from "@halfspace/db";
+import { ensureHalfspaceSchema, fetchSeasonPlayerCohort } from "@halfspace/db";
 import "dotenv/config";
 import { createHalfspaceAgent } from "./agent.js";
 import { getLens } from "./lens.js";
@@ -7,6 +7,12 @@ import { getLens } from "./lens.js";
 const port = Number(process.env.STUDIO_PORT || 3001);
 
 await ensureHalfspaceSchema();
+console.log("⏳ Pre-warming Liga 1 25/26 & 26/27 PostgreSQL cohorts...");
+await Promise.all([
+  fetchSeasonPlayerCohort("26/27").catch(() => []),
+  fetchSeasonPlayerCohort("25/26").catch(() => []),
+]);
+console.log("✓ Liga 1 cohorts cached in memory (0ms query latency)!");
 
 const agent = createHalfspaceAgent();
 

@@ -92,13 +92,28 @@ export type RawAggregatedPlayer = {
   avgRating: number;
 };
 
+const seasonCohortCache = new Map<string, { expiresAt: number; data: RawAggregatedPlayer[] }>();
+const seasonInFlight = new Map<string, Promise<RawAggregatedPlayer[]>>();
+const COHORT_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+
 /**
  * Fetches aggregated season cohort from PostgreSQL `sofascore` schema with PAdj & true positional share.
  */
 export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Promise<RawAggregatedPlayer[]> {
   const { seasonId, seasonKey } = resolveSeasonId(seasonInput);
 
-  const sql = `
+  const cached = seasonCohortCache.get(seasonKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
+  const inflight = seasonInFlight.get(seasonKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = (async () => {
+    const sql = `
     WITH player_pos_minutes AS (
       SELECT
         s.player_id,
@@ -165,9 +180,9 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
     ORDER BY agg.minutes_played DESC;
   `;
 
-  const rows = await queryReadOnly(sql, [LIGA1_TOURNAMENT_ID, seasonId]);
+    const rows = await queryReadOnly(sql, [LIGA1_TOURNAMENT_ID, seasonId], 25000);
 
-  return rows.map((r) => {
+    const result = rows.map((r) => {
     const mins = Math.max(1, Number(r.minutes_played ?? 1));
     const nineties = mins / 90;
     const oppTouches = Math.max(200, Number(r.opponent_touches ?? 500));
@@ -224,6 +239,14 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
       avgRating: num(r.avg_rating || 6.85),
     };
   });
+    seasonCohortCache.set(seasonKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: result });
+    return result;
+  })().finally(() => {
+    seasonInFlight.delete(seasonKey);
+  });
+
+  seasonInFlight.set(seasonKey, promise);
+  return promise;
 }
 
 /**
