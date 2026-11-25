@@ -2,7 +2,9 @@ import { ensureHalfspaceSchema, getPgPool, queryReadOnly } from "./client.js";
 import { searchRagDocuments } from "./client.js";
 import {
   LIGA1_TOURNAMENT_ID,
+  resolveLeagueAndSeason,
   resolveSeasonId,
+  TOURNAMENTS,
   type PeerComparisonCardData,
   type PlayerScoutingCardData,
   type PrematchLineupCardData,
@@ -97,17 +99,22 @@ const seasonInFlight = new Map<string, Promise<RawAggregatedPlayer[]>>();
 const COHORT_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
 /**
- * Fetches aggregated season cohort from PostgreSQL `sofascore` schema with PAdj & true positional share.
+ * Fetches aggregated season cohort from PostgreSQL `sofascore` schema (or pre-aggregated `halfspace.agg_player_season_all`)
+ * across ANY league (Liga 1, Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, UCL, Championship).
  */
-export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Promise<RawAggregatedPlayer[]> {
-  const { seasonId, seasonKey } = resolveSeasonId(seasonInput);
+export async function fetchSeasonPlayerCohort(
+  seasonInput?: string | number,
+  leagueInput?: string | number,
+): Promise<RawAggregatedPlayer[]> {
+  const { tournamentId, tournamentName, seasonId, seasonKey } = resolveLeagueAndSeason(leagueInput, seasonInput);
+  const cacheKey = `${tournamentId}:${seasonId}`;
 
-  const cached = seasonCohortCache.get(seasonKey);
+  const cached = seasonCohortCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
 
-  const inflight = seasonInFlight.get(seasonKey);
+  const inflight = seasonInFlight.get(cacheKey);
   if (inflight) {
     return inflight;
   }
@@ -115,15 +122,15 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
   const promise = (async () => {
     await ensureHalfspaceSchema();
 
-    // 1. Check pre-aggregated table `halfspace.agg_player_season_liga1` first (<50ms)
+    // 1. Check pre-aggregated table `halfspace.agg_player_season_all` first (<30ms)
     try {
       const aggRes = await getPgPool().query(
-        `SELECT payload FROM halfspace.agg_player_season_liga1 WHERE season_id = $1`,
-        [seasonId],
+        `SELECT payload FROM halfspace.agg_player_season_all WHERE tournament_id = $1 AND season_id = $2`,
+        [tournamentId, seasonId],
       );
-      if (aggRes.rows.length > 50) {
+      if (aggRes.rows.length > 20) {
         const fromAgg = aggRes.rows.map((r) => r.payload as RawAggregatedPlayer);
-        seasonCohortCache.set(seasonKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: fromAgg });
+        seasonCohortCache.set(cacheKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: fromAgg });
         return fromAgg;
       }
     } catch {
@@ -197,7 +204,7 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
     ORDER BY agg.minutes_played DESC;
   `;
 
-    const rows = await queryReadOnly(sql, [LIGA1_TOURNAMENT_ID, seasonId], 25000);
+    const rows = await queryReadOnly(sql, [tournamentId, seasonId], 35000);
 
     const result = rows.map((r) => {
     const mins = Math.max(1, Number(r.minutes_played ?? 1));
@@ -256,28 +263,28 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
       avgRating: num(r.avg_rating || 6.85),
     };
   });
-    seasonCohortCache.set(seasonKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: result });
+    seasonCohortCache.set(cacheKey, { expiresAt: Date.now() + COHORT_TTL_MS, data: result });
 
-    // Materialize into `halfspace.agg_player_season_liga1` in background so future cold starts are instant
+    // Materialize into `halfspace.agg_player_season_all` in background so future cold starts are instant
     void (async () => {
       try {
         const client = await getPgPool().connect();
         try {
-        const values: any[] = [];
-        const placeholders: string[] = [];
-        let pIdx = 1;
-        for (const p of result) {
-          placeholders.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}::jsonb, NOW())`);
-          values.push(seasonId, seasonKey, p.playerId, JSON.stringify(p));
-        }
-        if (placeholders.length > 0) {
-          await client.query(
-            `INSERT INTO halfspace.agg_player_season_liga1 (season_id, season_key, player_id, payload, updated_at)
-             VALUES ${placeholders.join(", ")}
-             ON CONFLICT (season_id, player_id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-            values,
-          );
-        }
+          const values: any[] = [];
+          const placeholders: string[] = [];
+          let pIdx = 1;
+          for (const p of result) {
+            placeholders.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}::jsonb, NOW())`);
+            values.push(tournamentId, tournamentName, seasonId, seasonKey, p.playerId, JSON.stringify(p));
+          }
+          if (placeholders.length > 0) {
+            await client.query(
+              `INSERT INTO halfspace.agg_player_season_all (tournament_id, tournament_name, season_id, season_key, player_id, payload, updated_at)
+               VALUES ${placeholders.join(", ")}
+               ON CONFLICT (tournament_id, season_id, player_id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+              values,
+            );
+          }
         } finally {
           client.release();
         }
@@ -288,17 +295,32 @@ export async function fetchSeasonPlayerCohort(seasonInput?: string | number): Pr
 
     return result;
   })().finally(() => {
-    seasonInFlight.delete(seasonKey);
+    seasonInFlight.delete(cacheKey);
   });
 
-  seasonInFlight.set(seasonKey, promise);
+  seasonInFlight.set(cacheKey, promise);
   return promise;
+}
+
+/**
+ * Materialize all 23 tournament x season combinations across all 8 leagues into `halfspace.agg_player_season_all`.
+ */
+export async function materializeAllLeaguesAggregates(): Promise<Array<{ tournamentName: string; seasonKey: string; count: number }>> {
+  const summary: Array<{ tournamentName: string; seasonKey: string; count: number }> = [];
+  for (const t of Object.values(TOURNAMENTS)) {
+    for (const sKey of Object.keys(t.seasons)) {
+      const cohort = await fetchSeasonPlayerCohort(sKey, t.id);
+      summary.push({ tournamentName: t.name, seasonKey: sKey, count: cohort.length });
+    }
+  }
+  return summary;
 }
 
 /**
  * Tool 1: Scout Liga 1 players with domain rules (min minutes, true position >=35%, PAdj defense, progression proxy).
  */
 export async function scoutLiga1Players(input: {
+  league?: string;
   position?: string;
   season?: string;
   ageGroup?: "U23" | "Senior" | "All";
@@ -308,8 +330,8 @@ export async function scoutLiga1Players(input: {
   styleFocus?: "progression" | "defense_padj" | "attacking_xg" | "creative_keypass" | "balanced";
   limit?: number;
 }) {
-  const { seasonKey, isOngoing } = resolveSeasonId(input.season);
-  const cohort = await fetchSeasonPlayerCohort(seasonKey);
+  const { tournamentName, seasonKey, isOngoing } = resolveLeagueAndSeason(input.league, input.season);
+  const cohort = await fetchSeasonPlayerCohort(seasonKey, input.league);
 
   // Determine default minMinutes (450 for full seasons, or relax to 180 if ongoing 26/27 has early sample)
   const maxSeasonMins = Math.max(0, ...cohort.map((p) => p.minutesPlayed));
@@ -404,6 +426,7 @@ export async function scoutLiga1Players(input: {
   };
 
   return {
+    league: tournamentName,
     season: seasonKey,
     minMinutesApplied: defaultMinMins,
     totalPeersMatched: filtered.length,
@@ -419,6 +442,7 @@ export async function scoutLiga1Players(input: {
  */
 export async function getPlayerReportData(input: {
   playerName: string;
+  league?: string;
   seasonA?: string; // current/target season (default 26/27)
   seasonB?: string; // comparison/previous season (optional, e.g. 25/26)
 }): Promise<{
@@ -426,11 +450,13 @@ export async function getPlayerReportData(input: {
   message?: string;
   card?: PlayerScoutingCardData;
 }> {
-  const currSeason = resolveSeasonId(input.seasonA ?? "26/27");
-  const prevSeason = input.seasonB ? resolveSeasonId(input.seasonB) : resolveSeasonId("25/26");
+  const currSeason = resolveLeagueAndSeason(input.league, input.seasonA ?? "26/27");
+  const prevSeason = input.seasonB
+    ? resolveLeagueAndSeason(input.league, input.seasonB)
+    : resolveLeagueAndSeason(input.league, "25/26");
 
-  const currCohort = await fetchSeasonPlayerCohort(currSeason.seasonKey);
-  const prevCohort = await fetchSeasonPlayerCohort(prevSeason.seasonKey);
+  const currCohort = await fetchSeasonPlayerCohort(currSeason.seasonKey, currSeason.tournamentId);
+  const prevCohort = await fetchSeasonPlayerCohort(prevSeason.seasonKey, prevSeason.tournamentId);
 
   const q = input.playerName.toLowerCase().trim();
   let target = currCohort.find(

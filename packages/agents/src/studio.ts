@@ -1,7 +1,7 @@
 import { Studio } from "@anvia/studio";
-import { ensureHalfspaceSchema, fetchSeasonPlayerCohort } from "@halfspace/db";
+import { ensureHalfspaceSchema, fetchSeasonPlayerCohort, memoryStore } from "@halfspace/db";
 import "dotenv/config";
-import { createHalfspaceAgent } from "./agent.js";
+import { createHalfspaceAgent, formatSavedUserFactsBlock } from "./agent.js";
 import { getLens } from "./lens.js";
 
 const port = Number(process.env.STUDIO_PORT || 3001);
@@ -14,7 +14,11 @@ await Promise.all([
 ]);
 console.log("✓ Liga 1 cohorts cached in memory (0ms query latency)!");
 
-const agent = createHalfspaceAgent();
+const userFactsBlock = await formatSavedUserFactsBlock();
+const agent = createHalfspaceAgent({
+  memoryStore,
+  extraInstructions: userFactsBlock || undefined,
+});
 
 console.log(`========================================================`);
 console.log(`⚽ Starting Halfspace Anvia Studio on http://localhost:${port}`);

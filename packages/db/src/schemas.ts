@@ -2,30 +2,140 @@ import { z } from "zod";
 
 export const LIGA1_TOURNAMENT_ID = 1015;
 
+export const TOURNAMENTS: Record<
+  number,
+  { id: number; name: string; aliases: string[]; seasons: Record<string, number> }
+> = {
+  1015: {
+    id: 1015,
+    name: "Indonesia Super League",
+    aliases: ["liga 1", "indonesia", "isl", "super league", "bri liga 1"],
+    seasons: { "24/25": 65049, "25/26": 78590, "26/27": 100394 },
+  },
+  17: {
+    id: 17,
+    name: "Premier League",
+    aliases: ["premier league", "epl", "inggris", "english"],
+    seasons: { "21/22": 37036, "24/25": 61627, "25/26": 76986, "26/27": 96668 },
+  },
+  8: {
+    id: 8,
+    name: "LaLiga",
+    aliases: ["laliga", "la liga", "spanyol", "spain"],
+    seasons: { "24/25": 61643, "25/26": 77559, "26/27": 97268 },
+  },
+  23: {
+    id: 23,
+    name: "Serie A",
+    aliases: ["serie a", "italia", "italy"],
+    seasons: { "24/25": 63515, "25/26": 76457, "26/27": 95836 },
+  },
+  35: {
+    id: 35,
+    name: "Bundesliga",
+    aliases: ["bundesliga", "jerman", "germany"],
+    seasons: { "24/25": 63516, "25/26": 77333, "26/27": 97464 },
+  },
+  34: {
+    id: 34,
+    name: "Ligue 1",
+    aliases: ["ligue 1", "prancis", "france"],
+    seasons: { "24/25": 61736, "25/26": 77356, "26/27": 96127 },
+  },
+  7: {
+    id: 7,
+    name: "UEFA Champions League",
+    aliases: ["ucl", "champions league", "liga champions"],
+    seasons: { "24/25": 61644, "25/26": 76953, "26/27": 96518 },
+  },
+  18: {
+    id: 18,
+    name: "Championship",
+    aliases: ["championship", "efl championship"],
+    seasons: { "25/26": 77347 },
+  },
+};
+
 export const LIGA1_SEASONS: Record<string, { id: number; label: string; isOngoing: boolean }> = {
   "24/25": { id: 65049, label: "2024/2025", isOngoing: false },
   "25/26": { id: 78590, label: "2025/2026", isOngoing: false },
   "26/27": { id: 100394, label: "2026/2027", isOngoing: true },
 };
 
+export function resolveLeagueAndSeason(
+  leagueInput?: string | number,
+  seasonInput?: string | number,
+): {
+  tournamentId: number;
+  tournamentName: string;
+  seasonId: number;
+  seasonKey: string;
+  isOngoing: boolean;
+} {
+  let tournament = TOURNAMENTS[1015]!;
+  if (typeof leagueInput === "number" && TOURNAMENTS[leagueInput]) {
+    tournament = TOURNAMENTS[leagueInput]!;
+  } else if (typeof leagueInput === "string" && leagueInput.trim()) {
+    const q = leagueInput.toLowerCase().trim();
+    for (const t of Object.values(TOURNAMENTS)) {
+      if (
+        String(t.id) === q ||
+        t.name.toLowerCase().includes(q) ||
+        t.aliases.some((a) => q.includes(a))
+      ) {
+        tournament = t;
+        break;
+      }
+    }
+  }
+
+  const normalizedSeason = String(seasonInput ?? "26/27").trim();
+  let seasonKey = "26/27";
+  if (normalizedSeason.includes("21")) seasonKey = "21/22";
+  else if (normalizedSeason.includes("24")) seasonKey = "24/25";
+  else if (normalizedSeason.includes("25")) seasonKey = "25/26";
+  else seasonKey = "26/27";
+
+  // Check if seasonInput was a direct numeric season_id
+  if (typeof seasonInput === "number" || /^\d{4,6}$/.test(normalizedSeason)) {
+    const numId = Number(normalizedSeason);
+    for (const t of Object.values(TOURNAMENTS)) {
+      for (const [sKey, sId] of Object.entries(t.seasons)) {
+        if (sId === numId) {
+          return {
+            tournamentId: t.id,
+            tournamentName: t.name,
+            seasonId: sId,
+            seasonKey: sKey,
+            isOngoing: sKey === "26/27",
+          };
+        }
+      }
+    }
+  }
+
+  const seasonId =
+    tournament.seasons[seasonKey] ??
+    tournament.seasons["26/27"] ??
+    tournament.seasons["25/26"] ??
+    Object.values(tournament.seasons)[0]!;
+
+  return {
+    tournamentId: tournament.id,
+    tournamentName: tournament.name,
+    seasonId,
+    seasonKey,
+    isOngoing: seasonKey === "26/27",
+  };
+}
+
 export function resolveSeasonId(seasonInput?: string | number): {
   seasonId: number;
   seasonKey: string;
   isOngoing: boolean;
 } {
-  if (typeof seasonInput === "number") {
-    for (const [k, v] of Object.entries(LIGA1_SEASONS)) {
-      if (v.id === seasonInput) return { seasonId: v.id, seasonKey: k, isOngoing: v.isOngoing };
-    }
-  }
-  const normalized = String(seasonInput ?? "26/27").trim();
-  if (normalized.includes("24") || normalized === "65049") {
-    return { seasonId: 65049, seasonKey: "24/25", isOngoing: false };
-  }
-  if (normalized.includes("25") || normalized === "78590") {
-    return { seasonId: 78590, seasonKey: "25/26", isOngoing: false };
-  }
-  return { seasonId: 100394, seasonKey: "26/27", isOngoing: true };
+  const res = resolveLeagueAndSeason(1015, seasonInput);
+  return { seasonId: res.seasonId, seasonKey: res.seasonKey, isOngoing: res.isOngoing };
 }
 
 // 1. Player Scouting & 2-Season Evolution Visual Card Schema

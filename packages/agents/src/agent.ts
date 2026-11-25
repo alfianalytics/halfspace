@@ -7,6 +7,7 @@ import {
   type Message,
   type UserMessage,
 } from "@anvia/core";
+import { loadUserMemoryFacts, memoryStore } from "@halfspace/db";
 import { HALFSPACE_INSTRUCTIONS } from "./instructions.js";
 import { getLens, recordTurnTrace } from "./lens.js";
 import { DEFAULT_MODEL_ID, getModel } from "./models.js";
@@ -58,6 +59,19 @@ function extractLastUserText(messages: readonly Message[]): string {
   if (typeof lastUser.content === "string") return lastUser.content;
   const part = lastUser.content.find((p) => p.type === "text");
   return part && "text" in part ? part.text : "";
+}
+
+export async function formatSavedUserFactsBlock(): Promise<string> {
+  try {
+    const facts = await loadUserMemoryFacts();
+    if (facts.length === 0) return "";
+    return [
+      "## Saved User Memory Facts (`halfspace.user_facts`)",
+      ...facts.map((f) => `- **${f.key}**: ${f.fact}`),
+    ].join("\n");
+  } catch {
+    return "";
+  }
 }
 
 export function runHalfspaceAgent(options: RunHalfspaceAgentOptions): AgentStream<string> {

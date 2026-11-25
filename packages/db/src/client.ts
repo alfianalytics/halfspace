@@ -133,13 +133,22 @@ export async function ensureHalfspaceSchema(): Promise<void> {
             );
           `);
           await client.query(`
-            CREATE TABLE IF NOT EXISTS halfspace.agg_player_season_liga1 (
+            CREATE TABLE IF NOT EXISTS halfspace.agg_player_season_all (
+              tournament_id INT NOT NULL,
+              tournament_name TEXT NOT NULL,
               season_id INT NOT NULL,
               season_key TEXT NOT NULL,
               player_id BIGINT NOT NULL,
               payload JSONB NOT NULL,
               updated_at TIMESTAMP DEFAULT NOW(),
-              PRIMARY KEY (season_id, player_id)
+              PRIMARY KEY (tournament_id, season_id, player_id)
+            );
+          `);
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS halfspace.user_facts (
+              fact_key TEXT PRIMARY KEY,
+              fact_value TEXT NOT NULL,
+              updated_at TIMESTAMP DEFAULT NOW()
             );
           `);
 
@@ -473,3 +482,83 @@ export class HalfspaceMemoryStore implements MemoryStore {
 }
 
 export const memoryStore = new HalfspaceMemoryStore();
+
+// ============================================================================
+// EXPLICIT USER FACT MEMORY (`halfspace.user_facts` + `.user-memory.json`)
+// ============================================================================
+
+const LOCAL_USER_FACTS_PATH = path.join(ROOT_DIR, ".user-memory.json");
+
+export type StoredUserFact = {
+  key: string;
+  fact: string;
+  updatedAt: string;
+};
+
+function readLocalUserFacts(): StoredUserFact[] {
+  try {
+    if (fs.existsSync(LOCAL_USER_FACTS_PATH)) {
+      const parsed = JSON.parse(fs.readFileSync(LOCAL_USER_FACTS_PATH, "utf8"));
+      return Array.isArray(parsed) ? parsed : [];
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+function writeLocalUserFacts(facts: StoredUserFact[]) {
+  try {
+    fs.writeFileSync(LOCAL_USER_FACTS_PATH, JSON.stringify(facts, null, 2), "utf8");
+  } catch {
+    // ignore
+  }
+}
+
+export async function saveUserMemoryFact(key: string, fact: string): Promise<StoredUserFact> {
+  await ensureHalfspaceSchema();
+  const cleanKey = key.trim();
+  const cleanFact = fact.trim();
+  const now = new Date().toISOString();
+
+  const local = readLocalUserFacts();
+  const idx = local.findIndex((f) => f.key.toLowerCase() === cleanKey.toLowerCase());
+  const entry: StoredUserFact = { key: cleanKey, fact: cleanFact, updatedAt: now };
+  if (idx >= 0) local[idx] = entry;
+  else local.push(entry);
+  writeLocalUserFacts(local);
+
+  try {
+    await getPgPool().query(
+      `INSERT INTO halfspace.user_facts (fact_key, fact_value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (fact_key) DO UPDATE SET fact_value = EXCLUDED.fact_value, updated_at = NOW()`,
+      [cleanKey, cleanFact],
+    );
+  } catch {
+    // stored locally
+  }
+  return entry;
+}
+
+export async function loadUserMemoryFacts(): Promise<StoredUserFact[]> {
+  await ensureHalfspaceSchema();
+  try {
+    const res = await getPgPool().query(
+      `SELECT fact_key AS key, fact_value AS fact, updated_at AS "updatedAt"
+       FROM halfspace.user_facts
+       ORDER BY updated_at DESC`,
+    );
+    if (res.rows.length > 0) {
+      return res.rows.map((r) => ({
+        key: String(r.key),
+        fact: String(r.fact),
+        updatedAt: new Date(r.updatedAt).toISOString(),
+      }));
+    }
+  } catch {
+    // fallback
+  }
+  return readLocalUserFacts();
+}
+

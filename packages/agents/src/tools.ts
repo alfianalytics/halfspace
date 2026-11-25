@@ -2,7 +2,9 @@ import { createTool } from "@anvia/core";
 import {
   getPlayerReportData,
   getPrematchContext,
+  loadUserMemoryFacts,
   queryReadOnly,
+  saveUserMemoryFact,
   scoutLiga1Players,
   searchRagDocuments,
 } from "@halfspace/db";
@@ -50,8 +52,12 @@ export const searchLiga1KnowledgeRagTool = createTool({
 export const scoutPlayersTool = createTool({
   name: "scout_players",
   description:
-    "Scout and rank Indonesia Super League (Liga 1) players from PostgreSQL by position (CM, DM, AM, CB, FB, W, ST, GK), season (24/25, 25/26, 26/27), ageGroup (U23, Senior, All), nationality (Local, Foreign, All), club, and styleFocus (progression, defense_padj, attacking_xg, creative_keypass, balanced). Also returns a validated `comparisonCard` visual payload for rendering the Peer Comparison Chart in the chat.",
+    "Scout and rank players from PostgreSQL across Indonesia Super League (Liga 1) OR Top European Leagues (Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, UEFA Champions League, Championship) by position (CM, DM, AM, CB, FB, W, ST, GK), season (24/25, 25/26, 26/27), ageGroup (U23, Senior, All), nationality (Local, Foreign, All), club, and styleFocus. Also returns a validated `comparisonCard` visual payload for rendering the Peer Comparison Chart.",
   inputSchema: z.object({
+    league: z
+      .string()
+      .optional()
+      .describe("League name: 'Liga 1' (default), 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
     position: z.string().optional().describe("Target position: CM, DM, AM, CB, FB, W, ST, GK"),
     season: z.string().optional().describe("Season: 26/27 (default), 25/26, or 24/25"),
     ageGroup: z.enum(["U23", "Senior", "All"]).optional().describe("U23 (<=23), Senior (>23), or All"),
@@ -101,9 +107,13 @@ export const getPrematchContextTool = createTool({
 export const getPlayerReportDataTool = createTool({
   name: "get_player_report_data",
   description:
-    "Generate a detailed single-season or two-season evolution (e.g. 25/26 vs 26/27) scouting report and percentile visual card for a specific Liga 1 player. Automatically applies the >=180 mins Early Season Sample rule for ongoing season 26/27 and returns a validated `visualCard` (`player_scouting`) rendered inline in the chat.",
+    "Generate a detailed single-season or two-season evolution (e.g. 25/26 vs 26/27) scouting report and percentile visual card for a specific player across Liga 1 or Top European Leagues (Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, UCL). Automatically applies the >=180 mins Early Season Sample rule for ongoing season 26/27 and returns a validated `visualCard` (`player_scouting`).",
   inputSchema: z.object({
-    playerName: z.string().describe("Player name, e.g. Marc Klok, Rizky Ridho, Beckham Putra, Francisco Rivera, Kadek Arel"),
+    playerName: z.string().describe("Player name, e.g. Mariano Peralta, Marc Klok, Rizky Ridho, Bukayo Saka, Lamine Yamal"),
+    league: z
+      .string()
+      .optional()
+      .describe("League name: 'Liga 1' (default), 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
     seasonA: z.string().optional().describe("Current/target season, default 26/27"),
     seasonB: z.string().optional().describe("Comparison season for 2-season evolution, default 25/26"),
   }),
@@ -171,6 +181,28 @@ export const searchLiveWebNewsTool = createTool({
   },
 });
 
+/**
+ * 7. Explicit Cross-Session User Memory Tool (`remember_user_fact`)
+ */
+export const rememberUserFactTool = createTool({
+  name: "remember_user_fact",
+  description:
+    "Save a specific fact, preference, favorite club, target player watchlist, or user instruction into persistent cross-session memory (`halfspace.user_facts`) whenever the user explicitly asks you to remember/save something or shares personal context.",
+  inputSchema: z.object({
+    key: z.string().describe("Short identifier key, e.g. 'favorite_club', 'watchlist_midfielder', 'user_role'"),
+    fact: z.string().describe("The fact or preference to remember across all sessions"),
+  }),
+  execute: async ({ key, fact }) => {
+    const saved = await saveUserMemoryFact(key, fact);
+    const allFacts = await loadUserMemoryFacts();
+    return {
+      saved,
+      totalRememberedFacts: allFacts.length,
+      allFacts,
+    };
+  },
+});
+
 export const HALFSPACE_TOOLS = [
   scoutPlayersTool,
   getPrematchContextTool,
@@ -178,4 +210,5 @@ export const HALFSPACE_TOOLS = [
   searchLiga1KnowledgeRagTool,
   queryLiga1ReadonlySqlTool,
   searchLiveWebNewsTool,
+  rememberUserFactTool,
 ] as const;
