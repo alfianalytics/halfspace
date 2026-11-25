@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "liga1-intelligence-mcp": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp",
+      "ssrfProtection": "disabled"
+    }
+  }
+}

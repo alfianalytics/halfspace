@@ -1,0 +1,18 @@
+{
+  "name": "halfspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @halfspace/api dev",
+    "dev:web": "pnpm --filter @halfspace/web dev",
+    "studio": "pnpm --filter @halfspace/agents studio",
+    "eval": "pnpm --filter @halfspace/agents eval",
+    "mcp:stdio": "pnpm --filter @halfspace/mcp-server start:stdio",
+    "mcp:http": "pnpm --filter @halfspace/mcp-server start:http",
+    "sync:news": "pnpm --filter @halfspace/agents sync:news",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

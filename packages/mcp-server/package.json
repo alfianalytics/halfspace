@@ -1,0 +1,30 @@
+{
+  "name": "@halfspace/mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/server.ts",
+  "types": "./src/server.ts",
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "scripts": {
+    "start:stdio": "tsx src/mcp-stdio.ts",
+    "start:http": "tsx src/mcp-http.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@halfspace/db": "workspace:*",
+    "@hono/node-server": "^2.1.1",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "dotenv": "^17.4.2",
+    "hono": "^4.13.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.8.2"
+  }
+}
