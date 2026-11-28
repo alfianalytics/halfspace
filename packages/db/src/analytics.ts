@@ -1071,14 +1071,14 @@ export async function getFeaturedLiga1Fixtures(limit = 6) {
       `
       SELECT
         match_id,
-        (match_datetime AT TIME ZONE 'UTC') AS utc_dt,
+        TO_CHAR(match_datetime, 'DD Mon') || ' • ' || TO_CHAR(match_datetime, 'HH24:MI') || ' WIB' AS wib_label,
         round,
         home_team_name AS home_team,
         away_team_name AS away_team
       FROM sofascore.fact_upcoming_match
       WHERE tournament_id = $1
         AND COALESCE(status_type, 'notstarted') = 'notstarted'
-        AND match_datetime >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '6 hours'
+        AND match_datetime >= (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '4 hours'
       ORDER BY match_datetime ASC
       LIMIT $2;
       `,
@@ -1086,20 +1086,13 @@ export async function getFeaturedLiga1Fixtures(limit = 6) {
     );
 
     if (upcomingRows.length > 0) {
-      return upcomingRows.map((r) => {
-        const dt = r.utc_dt ? new Date(r.utc_dt) : null;
-        const scoreLabel =
-          dt && Number.isFinite(dt.getTime())
-            ? `${dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", timeZone: "Asia/Jakarta" })} • ${dt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).replace(".", ":")} WIB`
-            : "UPCOMING";
-        return {
-          matchId: Number(r.match_id),
-          homeTeam: String(r.home_team),
-          awayTeam: String(r.away_team),
-          round: Number(r.round ?? 1),
-          scoreLabel,
-        };
-      });
+      return upcomingRows.map((r) => ({
+        matchId: Number(r.match_id),
+        homeTeam: String(r.home_team),
+        awayTeam: String(r.away_team),
+        round: Number(r.round ?? 1),
+        scoreLabel: String(r.wib_label || "UPCOMING"),
+      }));
     }
   } catch {
     // Fallback to fact_match below if fact_upcoming_match unavailable
