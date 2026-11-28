@@ -1,13 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  BarChart3,
-  Calendar,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { ArrowRight, Calendar, Send } from "lucide-react";
 import { newSessionId, setPendingMessage } from "../lib/pending-message";
 
 const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -40,37 +33,50 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-const USE_CASE_CARDS = [
+type WorkModeKey = "scouting" | "prematch" | "report";
+
+const WORK_MODES: Record<
+  WorkModeKey,
   {
-    icon: Users,
-    title: "1. Player Scouting & Peer Quadrant",
-    badge: "scout_players",
-    description: "Cari pemain U-23 lokal atau asing berdasarkan progresi bola & PAdj defense lengkap dengan grafik 2D Quadrant.",
-    prompt:
-      "Carikan gelandang tengah (CM) U-23 lokal di Liga 1 musim 25/26 yang bagus dalam progresi bola dan bertahan (PAdj), lalu tampilkan visual peer comparison card-nya.",
+    tabLabel: string;
+    toolTag: string;
+    guardrailNote: string;
+    samplePrompt: string;
+  }
+> = {
+  scouting: {
+    tabLabel: "01 · Scouting",
+    toolTag: "scout_players",
+    guardrailNote: "Guardrail: >=450 mins • >=35% true position • PAdj / 500 opp. touches",
+    samplePrompt:
+      "Carikan gelandang tengah (CM) U-23 lokal di Liga 1 musim 25/26 yang unggul dalam progresi bola (accurate_long_balls) dan pertahanan PAdj, lalu tampilkan visual peer comparison card-nya.",
   },
-  {
-    icon: ShieldCheck,
-    title: "2. Pre-Match & Prediksi Starting XI",
-    badge: "get_prematch_context",
-    description: "Gabungkan statistik performa terakhir dengan RAG berita cedera, pemain 50/50 doubtful (+ backup), & aturan kuota U-23.",
-    prompt:
+  prematch: {
+    tabLabel: "02 · Pre-Match XI",
+    toolTag: "get_prematch_context",
+    guardrailNote: "Guardrail: RAG Berita Cedera & 50/50 Doubtful + Kuota U-23 & Asing",
+    samplePrompt:
       "Analisis prematch Persib Bandung vs Persija Jakarta minggu ini dan prediksi Starting XI kedua tim berdasarkan berita cedera/akumulasi kartu terbaru beserta visual pitch board-nya.",
   },
-  {
-    icon: BarChart3,
-    title: "3. Visual Report & 2-Season Evolution",
-    badge: "get_player_report_data",
-    description: "Generate kartu profil persentil pemain atau perbandingan evolusi 2 musim (25/26 vs 26/27) yang siap di-export ke PNG.",
-    prompt:
+  report: {
+    tabLabel: "03 · 2-Season Report",
+    toolTag: "get_player_report_data",
+    guardrailNote: "Guardrail: >=180 mins Early Season Sample (26/27) vs Full Season (25/26)",
+    samplePrompt:
       "Buatkan visual report scouting dan perbandingan evolusi dua musim (25/26 vs 26/27) untuk Marc Klok lengkap dengan persentil dan analisis taktiknya.",
   },
-];
+};
 
 function Home() {
   const fixtures = Route.useLoaderData();
-  const [input, setInput] = useState("");
+  const [activeMode, setActiveMode] = useState<WorkModeKey>("scouting");
+  const [input, setInput] = useState(WORK_MODES.scouting.samplePrompt);
   const navigate = useNavigate();
+
+  function selectMode(mode: WorkModeKey) {
+    setActiveMode(mode);
+    setInput(WORK_MODES[mode].samplePrompt);
+  }
 
   function startConversation(text: string) {
     const message = text.trim();
@@ -85,33 +91,143 @@ function Home() {
     startConversation(input);
   }
 
+  const currentMode = WORK_MODES[activeMode];
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 bg-zinc-950 overflow-y-auto">
-      <div className="w-full max-w-4xl space-y-7">
-        {/* Hero */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
-            <Sparkles className="w-3.5 h-3.5" />
-            Indonesia Super League (Liga 1) Intelligence · Tanpa Perlu SQL
+    <div className="flex-1 flex flex-col bg-[#0F172A] overflow-y-auto">
+      {/* Top Editorial Sub-Header */}
+      <div className="px-6 md:px-8 py-3 border-b border-[#334155] bg-[#0B1120] flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="font-tech text-[11px] uppercase tracking-widest text-[#6EE7B7] font-semibold">
+            Indonesia Super League Intelligence Desk
+          </span>
+          <span className="text-[#334155]">|</span>
+          <span className="font-tech text-[11px] text-[#94A3B8]">
+            8 Leagues • 14,184 Aggregated Player Profiles
+          </span>
+        </div>
+        <span className="font-tech text-[10px] text-[#64748B]">
+          NO-SQL CONVERSATIONAL WORKSPACE
+        </span>
+      </div>
+
+      {/* Asymmetric Split Layout: Left Work Desk (7 cols) + Right Matchweek Slate (5 cols) */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12">
+        {/* Left Column: Masthead + Segmented Work Brief Composer */}
+        <div className="lg:col-span-7 p-6 md:p-8 lg:border-r border-[#334155] flex flex-col justify-between gap-6">
+          <div className="space-y-6">
+            {/* Editorial Masthead */}
+            <div className="space-y-2.5">
+              <div className="font-tech text-[10px] uppercase tracking-widest text-[#38BDF8]">
+                PostgreSQL Analytics + Hybrid News &amp; Regulation RAG
+              </div>
+              <h1 className="font-editorial text-3xl md:text-4xl font-bold tracking-tight text-[#F8FAFC] leading-tight">
+                Analisis taktik, prediksi Starting XI, dan scouting berbasis data.
+              </h1>
+              <p className="text-sm text-[#94A3B8] max-w-xl leading-relaxed">
+                Pilih mode kerja di bawah atau tulis pertanyaan dalam bahasa sehari-hari. Sistem otomatis menarik data match, berita cedera terbaru, dan merender kartu visual siap ekspor.
+              </p>
+            </div>
+
+            {/* Segmented Work Mode Composer */}
+            <form
+              onSubmit={handleSubmit}
+              className="border border-[#334155] bg-[#1E293B]/40 rounded-lg overflow-hidden focus-within:border-[#6EE7B7] transition-colors"
+            >
+              {/* Segmented Tabs */}
+              <div className="grid grid-cols-3 border-b border-[#334155] bg-[#0B1120] text-xs font-semibold">
+                {(Object.keys(WORK_MODES) as WorkModeKey[]).map((key) => {
+                  const isActive = activeMode === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => selectMode(key)}
+                      className={`px-3 py-2.5 text-center border-r last:border-r-0 border-[#334155] transition-colors cursor-pointer ${
+                        isActive
+                          ? "bg-[#0F172A] text-[#6EE7B7] border-b-2 border-b-[#6EE7B7]"
+                          : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]/50"
+                      }`}
+                    >
+                      {WORK_MODES[key].tabLabel}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Textarea */}
+              <div className="p-4 space-y-3">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      startConversation(input);
+                    }
+                  }}
+                  placeholder="Tulis brief scouting, prematch, atau nama pemain..."
+                  rows={4}
+                  className="w-full bg-transparent text-sm text-[#F8FAFC] placeholder:text-[#64748B] focus:outline-none resize-none leading-relaxed"
+                />
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#334155]/80">
+                  <div className="font-tech text-[10px] text-[#94A3B8]">
+                    <span className="text-[#38BDF8] mr-1.5">[{currentMode.toolTag}]</span>
+                    {currentMode.guardrailNote}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!input.trim()}
+                    className="inline-flex items-center gap-2 rounded bg-[#6EE7B7] hover:bg-[#34D399] disabled:opacity-40 text-[#0F172A] px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Jalankan Analisis
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
-            Scouting, Prediksi Starting XI &amp; Visual Report Liga 1
-          </h1>
-          <p className="text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Dirancang untuk jurnalis olahraga, kreator konten, komentator, dan staf klub. Tanyakan dalam bahasa sehari-hari—Halfspace otomatis mengecek database PostgreSQL pertandingan, RAG berita cedera terbaru, serta regulasi kuota U-23 &amp; pemain asing.
-          </p>
+
+          {/* Methodology & Palette Legend Strip */}
+          <div className="pt-4 border-t border-[#334155] grid grid-cols-3 gap-4 text-[11px]">
+            <div>
+              <div className="font-tech text-[10px] text-[#6EE7B7] uppercase">Progression Proxy</div>
+              <div className="text-[#CBD5E1] mt-0.5">
+                <code className="font-tech text-[10px]">accurate_long_balls</code> &amp;{" "}
+                <code className="font-tech text-[10px]">acc_opp_half_passes</code>
+              </div>
+            </div>
+            <div>
+              <div className="font-tech text-[10px] text-[#38BDF8] uppercase">Calibrated Defense</div>
+              <div className="text-[#CBD5E1] mt-0.5">
+                PAdj per 500 opponent touches (<code className="font-tech text-[10px]">padj500</code>)
+              </div>
+            </div>
+            <div>
+              <div className="font-tech text-[10px] text-[#FF6350] uppercase">Lineup Integrity</div>
+              <div className="text-[#CBD5E1] mt-0.5">
+                Cek cedera, 50/50 doubtful, &amp; kuota U-23 / Asing
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Live Jadwal & Big Match Liga 1 Bar (1-Click Pre-Match Trigger) */}
-        <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/50 p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-200">
-              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Jadwal &amp; Big Match Liga 1 (Klik untuk Analisis Pre-Match &amp; Prediksi Lineup Instan)</span>
+        {/* Right Column: Matchweek Slate (1px Scoreboard Rail) */}
+        <div className="lg:col-span-5 p-6 md:p-8 bg-[#0B1120]/70 space-y-5">
+          <div className="flex items-center justify-between border-b border-[#334155] pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#6EE7B7]" />
+              <span className="font-tech text-xs uppercase tracking-wider font-bold text-[#F8FAFC]">
+                Matchweek Slate · Liga 1
+              </span>
             </div>
-            <span className="text-[10px] font-mono text-zinc-500">PostgreSQL Live Fixtures</span>
+            <span className="font-tech text-[10px] text-[#6EE7B7] border border-[#334155] px-2 py-0.5 rounded">
+              1-CLICK PRE-MATCH
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+
+          <div className="divide-y divide-[#334155]">
             {fixtures.slice(0, 6).map((f) => (
               <button
                 key={`${f.matchId}-${f.homeTeam}`}
@@ -121,84 +237,49 @@ function Home() {
                     `Analisis prematch ${f.homeTeam} vs ${f.awayTeam} dan prediksi Starting XI kedua tim berdasarkan performa terakhir, berita cedera/akumulasi kartu di RAG, serta aturan kuota U-23.`,
                   )
                 }
-                className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 hover:bg-zinc-800/80 hover:border-emerald-500/40 px-3 py-2 text-left transition-all cursor-pointer group"
+                className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-[#1E293B]/50 px-2 -mx-2 rounded transition-colors cursor-pointer group"
               >
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-zinc-100 group-hover:text-emerald-300 truncate">
-                    {f.homeTeam} vs {f.awayTeam}
+                  <div className="text-sm font-semibold text-[#F8FAFC] group-hover:text-[#6EE7B7] transition-colors truncate">
+                    {f.homeTeam} <span className="text-[#64748B] font-normal">vs</span> {f.awayTeam}
                   </div>
-                  <div className="text-[10px] text-zinc-500">Pekan {f.round} • Klik untuk Prediksi XI</div>
+                  <div className="font-tech text-[10px] text-[#94A3B8] mt-1 flex items-center gap-2">
+                    <span>PEKAN {f.round}</span>
+                    <span>•</span>
+                    <span className="text-[#38BDF8]">{f.scoreLabel}</span>
+                  </div>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px] shrink-0">
-                  {f.scoreLabel}
+                <span className="inline-flex items-center gap-1 font-tech text-[11px] px-2.5 py-1 border border-[#334155] group-hover:border-[#6EE7B7] text-[#CBD5E1] group-hover:text-[#6EE7B7] rounded shrink-0 transition-colors">
+                  Prediksi XI
+                  <ArrowRight className="w-3 h-3" />
                 </span>
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Prompt Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3.5 shadow-xl focus-within:border-emerald-500/60 transition-colors"
-        >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                startConversation(input);
-              }
-            }}
-            placeholder="Ketik pertanyaan analisis Liga 1 kamu di sini… (Tekan Enter untuk mulai)"
-            rows={3}
-            className="w-full bg-transparent px-2 py-1 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-relaxed"
-          />
-          <div className="flex items-center justify-between pt-2.5 border-t border-zinc-800/80">
-            <div className="flex items-center gap-2 text-[11px] text-zinc-500 px-1">
-              <span>MCP Tools: Player Scouting · Pre-Match Lineup · 2-Season Visual Report · News &amp; Rules RAG</span>
+          {/* Quick Player Spotlight Links */}
+          <div className="pt-4 border-t border-[#334155] space-y-2.5">
+            <div className="font-tech text-[10px] uppercase tracking-widest text-[#64748B]">
+              Quick Player Dossiers (Top Leagues &amp; Liga 1)
             </div>
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-4 py-2 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Mulai Analisis
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "Mariano Peralta (Liga 1)", q: "Buatkan visual report scouting untuk Mariano Peralta di Liga 1." },
+                { label: "Marc Klok (2-Season)", q: "Buatkan visual report evolusi dua musim (25/26 vs 26/27) untuk Marc Klok." },
+                { label: "Rizky Ridho (PAdj)", q: "Tampilkan visual report scouting dan metrik bertahan PAdj untuk Rizky Ridho." },
+                { label: "Bukayo Saka (EPL)", q: "Buatkan visual report scouting untuk Bukayo Saka di Premier League." },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => startConversation(item.q)}
+                  className="font-tech text-[11px] px-2.5 py-1 border border-[#334155] bg-[#0F172A] hover:border-[#38BDF8] text-[#CBD5E1] hover:text-[#38BDF8] rounded transition-colors cursor-pointer"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </form>
-
-        {/* 3 Core Use Case Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          {USE_CASE_CARDS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.title}
-                type="button"
-                onClick={() => startConversation(item.prompt)}
-                className="flex flex-col justify-between text-left p-4 rounded-2xl border border-zinc-800/90 bg-zinc-900/50 hover:bg-zinc-900 hover:border-emerald-500/40 transition-all group cursor-pointer"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Icon className="w-4 h-4 text-emerald-400" />
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-emerald-300">
-                      {item.badge}
-                    </span>
-                  </div>
-                  <div className="text-xs font-bold text-zinc-100 group-hover:text-emerald-300 transition-colors">
-                    {item.title}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">{item.description}</p>
-                  <div className="pt-2 border-t border-zinc-800/60 text-[11px] text-zinc-300 italic line-clamp-2">
-                    "{item.prompt}"
-                  </div>
-                </div>
-              </button>
-            );
-          })}
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import {
   ThreadPrimitive,
 } from "@anvia/react-ui";
 import { rootRouteId, useRouter } from "@tanstack/react-router";
-import { Activity, Bot, ChevronDown, Send, Sparkles, Square, User } from "lucide-react";
+import { Activity, ChevronDown, Send, Square } from "lucide-react";
 import { takePendingMessage } from "../lib/pending-message";
 import { ToolCall } from "./tool-call";
 
@@ -95,92 +95,80 @@ export function ChatScreen({ sessionId, initialMessages = [] }: ChatScreenProps)
 
   return (
     <ChatProvider controller={chat}>
-      <ThreadPrimitive.Root className="flex flex-col h-full w-full bg-zinc-950">
-        {/* Top Session Header + In-App Trace Summary Pill */}
-        <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-sm font-semibold text-zinc-100">
-              Halfspace · Liga 1 Tactical &amp; Visual Report Assistant
+      <ThreadPrimitive.Root className="flex flex-col h-full w-full bg-[#0F172A]">
+        {/* Editorial Top Session Header */}
+        <header className="flex items-center justify-between px-6 py-3 border-b border-[#334155] bg-[#0B1120] shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-[#6EE7B7]" />
+            <span className="font-editorial text-base font-bold text-[#F8FAFC]">
+              Halfspace Brief
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800/90 text-zinc-400 font-mono">
-              {sessionId}
-            </span>
+            <span className="text-[#334155]">|</span>
+            <span className="font-tech text-[11px] text-[#94A3B8]">{sessionId}</span>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setShowTraceDrawer((p) => !p)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium hover:bg-emerald-500/20 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-[#334155] bg-[#0F172A] hover:border-[#6EE7B7]/60 text-[#CBD5E1] font-tech text-[11px] transition-colors cursor-pointer"
             >
-              <Activity className="w-3.5 h-3.5" />
+              <Activity className="w-3.5 h-3.5 text-[#6EE7B7]" />
               <span>
-                Lens / In-App Trace ({traces.length} runs{latestTrace ? ` • ${latestTrace.modelId}` : ""})
+                Trace ({traces.length}
+                {latestTrace ? ` • ${latestTrace.modelId}` : ""})
               </span>
               <ChevronDown className="w-3 h-3" />
             </button>
-            <div className="text-xs text-zinc-500">
-              Status: <span className="text-zinc-300 font-medium capitalize">{chat.status}</span>
+            <div className="font-tech text-[11px] text-[#64748B] uppercase">
+              {chat.status}
             </div>
           </div>
         </header>
 
-        {/* Collapsible In-App Observability Trace Drawer */}
+        {/* Collapsible Observability Trace Drawer */}
         {showTraceDrawer && (
-          <div className="border-b border-zinc-800 bg-zinc-900/90 px-6 py-3 text-xs space-y-2 max-h-48 overflow-y-auto">
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="font-semibold text-zinc-200">
-                Anvia Lens &amp; In-App Workflow/Agent Trace Telemetry
+          <div className="border-b border-[#334155] bg-[#0B1120] px-6 py-3 text-xs space-y-2 max-h-48 overflow-y-auto">
+            <div className="flex items-center justify-between font-tech text-[10px] text-[#94A3B8]">
+              <span className="text-[#F8FAFC] font-bold uppercase tracking-wider">
+                Anvia Lens &amp; In-App Workflow Trace
               </span>
-              <span className="font-mono text-[11px]">Service: halfspace-liga1-agent</span>
+              <span>SERVICE: halfspace-liga1-agent</span>
             </div>
             {traces.length === 0 ? (
-              <div className="text-zinc-500 py-1">No agent runs recorded in this session yet.</div>
+              <div className="text-[#64748B] py-1 font-tech text-[11px]">No runs recorded yet.</div>
             ) : (
-              traces.map((t) => (
-                <div
-                  key={t.traceId}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-2.5 flex flex-wrap items-center justify-between gap-2"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-emerald-400 font-semibold">{t.traceId}</span>
-                      <span className="text-zinc-400">{new Date(t.timestamp).toLocaleTimeString()}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px]">
-                        {t.modelId}
-                      </span>
+              <div className="divide-y divide-[#334155] border-y border-[#334155]">
+                {traces.map((t) => (
+                  <div key={t.traceId} className="py-2 flex flex-wrap items-center justify-between gap-2 font-tech text-[11px]">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[#6EE7B7] font-bold">{t.traceId}</span>
+                      <span className="text-[#64748B]">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-[#38BDF8]">{t.modelId}</span>
                     </div>
-                    <div className="text-[11px] text-zinc-400">
-                      Workflow: <code className="text-sky-300">{t.workflowSteps.join(" → ")}</code>
+                    <div className="text-[#94A3B8] truncate">
+                      Tools: <span className="text-[#F8FAFC]">{t.mcpToolsCalled.join(", ")}</span> • RAG:{" "}
+                      <span className="text-[#6EE7B7]">{t.ragDocsCited.join(", ")}</span>
                     </div>
                   </div>
-                  <div className="text-right text-[11px] space-y-0.5">
-                    <div>
-                      MCP Tools: <code className="text-emerald-300">{t.mcpToolsCalled.join(", ")}</code>
-                    </div>
-                    <div>
-                      RAG Citations: <code className="text-amber-300">{t.ragDocsCited.join(", ")}</code>
-                    </div>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         )}
 
-        {/* Scrollable Message Viewport */}
-        <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto px-4 py-6">
+        {/* Message Viewport */}
+        <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto px-6 py-6">
           <div className="max-w-4xl mx-auto space-y-6">
-            <ThreadPrimitive.Empty className="py-16 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-                <Sparkles className="w-6 h-6" />
+            <ThreadPrimitive.Empty className="py-16 text-center space-y-2 border-y border-[#334155]">
+              <div className="font-tech text-[10px] uppercase tracking-widest text-[#6EE7B7]">
+                Ready for Brief
               </div>
-              <h2 className="text-lg font-semibold text-zinc-200">
-                Tanyakan Scouting, Pre-Match Lineup, atau Visual Report Liga 1
+              <h2 className="font-editorial text-xl font-bold text-[#F8FAFC]">
+                Tanyakan Scouting, Pre-Match Lineup, atau Visual Report
               </h2>
-              <p className="text-sm text-zinc-400 max-w-md mx-auto">
-                Tanpa perlu SQL. Halfspace otomatis menggabungkan database PostgreSQL Liga 1 dengan RAG Berita Cedera &amp; Regulasi PSSI/LIB.
+              <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
+                Data ditarik langsung dari PostgreSQL (8 Liga / 23 Musim) dan Hybrid News &amp; Regulation RAG.
               </p>
             </ThreadPrimitive.Empty>
 
@@ -188,66 +176,62 @@ export function ChatScreen({ sessionId, initialMessages = [] }: ChatScreenProps)
               {(message) =>
                 message.role === "user" ? (
                   <MessagePrimitive.Root key={message.id} className="flex justify-end">
-                    <div className="flex items-start gap-3 max-w-[82%]">
-                      <div className="rounded-2xl rounded-tr-sm bg-emerald-600 text-white px-4 py-3 text-sm leading-relaxed shadow-sm">
-                        <MessagePrimitive.Parts />
+                    <div className="max-w-[82%] border-l-2 border-[#6EE7B7] bg-[#1E293B]/70 px-4 py-3 rounded-r text-sm text-[#F8FAFC] leading-relaxed">
+                      <div className="font-tech text-[10px] uppercase tracking-wider text-[#6EE7B7] mb-1">
+                        Analyst Brief
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
-                        <User className="w-4 h-4 text-zinc-300" />
-                      </div>
+                      <MessagePrimitive.Parts />
                     </div>
                   </MessagePrimitive.Root>
                 ) : (
-                  <MessagePrimitive.Root key={message.id} className="flex justify-start">
-                    <div className="flex items-start gap-3.5 max-w-[95%] w-full">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                        <Bot className="w-4 h-4 text-emerald-400" />
+                  <MessagePrimitive.Root key={message.id} className="border-t border-[#334155]/70 pt-5">
+                    <div className="space-y-2 text-sm text-[#E2E8F0] leading-relaxed">
+                      <div className="font-tech text-[10px] uppercase tracking-widest text-[#38BDF8]">
+                        Halfspace Intelligence Report
                       </div>
-                      <div className="flex-1 min-w-0 space-y-2 text-sm text-zinc-200 leading-relaxed">
-                        <MessagePrimitive.Parts>
-                          {(part) => {
-                            if (part.type === "tool") {
-                              return <ToolCall part={part} />;
-                            }
-                            if (part.type === "text") {
-                              return (
-                                <MessagePrimitive.Markdown className="prose prose-invert max-w-none space-y-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-emerald-400 [&_a]:underline [&_code]:bg-zinc-800/90 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-zinc-900 [&_pre]:border [&_pre]:border-zinc-800 [&_pre]:p-3.5 [&_pre]:rounded-xl [&_pre]:overflow-x-auto [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold">
-                                  {part.text}
-                                </MessagePrimitive.Markdown>
-                              );
-                            }
-                            return <MessagePrimitive.Part />;
-                          }}
-                        </MessagePrimitive.Parts>
-                      </div>
+                      <MessagePrimitive.Parts>
+                        {(part) => {
+                          if (part.type === "tool") {
+                            return <ToolCall part={part} />;
+                          }
+                          if (part.type === "text") {
+                            return (
+                              <MessagePrimitive.Markdown className="prose prose-invert max-w-none space-y-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#38BDF8] [&_a]:underline [&_code]:font-tech [&_code]:bg-[#1E293B] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-[#6EE7B7] [&_pre]:bg-[#0B1120] [&_pre]:border [&_pre]:border-[#334155] [&_pre]:p-3.5 [&_pre]:rounded [&_pre]:overflow-x-auto [&_h1]:font-editorial [&_h1]:text-xl [&_h1]:font-bold [&_h2]:font-editorial [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-[#334155] [&_th]:py-1.5 [&_th]:text-left [&_th]:font-tech [&_th]:text-xs [&_td]:border-b [&_td]:border-[#334155]/50 [&_td]:py-1.5 [&_td]:text-xs">
+                                {part.text}
+                              </MessagePrimitive.Markdown>
+                            );
+                          }
+                          return <MessagePrimitive.Part />;
+                        }}
+                      </MessagePrimitive.Parts>
                     </div>
                   </MessagePrimitive.Root>
                 )
               }
             </ThreadPrimitive.Messages>
 
-            <ThreadPrimitive.Error className="rounded-xl border border-rose-900/60 bg-rose-950/40 px-4 py-3 text-sm text-rose-300" />
+            <ThreadPrimitive.Error className="border border-[#FF6350]/50 bg-[#FF6350]/10 px-4 py-3 text-xs text-[#FF6350] rounded" />
           </div>
         </ThreadPrimitive.Viewport>
 
         {/* Bottom Composer */}
-        <div className="p-4 border-t border-zinc-800/80 bg-zinc-950">
+        <div className="px-6 py-4 border-t border-[#334155] bg-[#0B1120]">
           <div className="max-w-4xl mx-auto">
-            <ComposerPrimitive.Root className="relative flex items-end gap-2 rounded-2xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 focus-within:border-emerald-500/60 transition-colors shadow-lg">
+            <ComposerPrimitive.Root className="flex items-end gap-3 border border-[#334155] bg-[#0F172A] px-4 py-2.5 rounded focus-within:border-[#6EE7B7] transition-colors">
               <ComposerPrimitive.TextareaInput
-                placeholder="Tanya Halfspace (misal: 'Analisis prematch Persib vs Persija & prediksi Starting XI', atau 'Buatkan report scouting Marc Klok')…"
+                placeholder="Lanjutkan analisis (misal: 'Bandingkan dengan gelandang Persija', atau 'Export visual card-nya')..."
                 rows={1}
-                className="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none max-h-36 leading-relaxed"
+                className="flex-1 bg-transparent text-sm text-[#F8FAFC] placeholder:text-[#64748B] focus:outline-none resize-none max-h-36 leading-relaxed"
               />
               {streaming ? (
-                <ComposerPrimitive.Stop className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer shrink-0">
+                <ComposerPrimitive.Stop className="inline-flex items-center gap-1.5 rounded bg-[#FF6350] hover:bg-[#F87171] text-[#0F172A] px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0">
                   <Square className="w-3.5 h-3.5 fill-current" />
                   Stop
                 </ComposerPrimitive.Stop>
               ) : (
-                <ComposerPrimitive.Submit className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer shrink-0">
+                <ComposerPrimitive.Submit className="inline-flex items-center gap-1.5 rounded bg-[#6EE7B7] hover:bg-[#34D399] disabled:opacity-40 text-[#0F172A] px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0">
                   <Send className="w-3.5 h-3.5" />
-                  Send
+                  Kirim
                 </ComposerPrimitive.Submit>
               )}
             </ComposerPrimitive.Root>

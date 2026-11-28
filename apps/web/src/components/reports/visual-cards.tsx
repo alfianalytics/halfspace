@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Download, Eye, Layers, Sparkles } from "lucide-react";
+import { Download } from "lucide-react";
 
 /**
- * Pure SVG / Canvas PNG Exporter for Halfspace Visual Report Cards
- * Supports Dual Export Modes: `editorial_dark` (#090A0F) and `transparent_clean`.
+ * Pure SVG / Canvas PNG Exporter for Halfspace Editorial Visual Cards
+ * Supports Dual Export Modes: `editorial_dark` (#0F172A) and `transparent_clean`.
  */
 async function exportElementAsPng(elementId: string, filename: string, mode: "editorial_dark" | "transparent_clean") {
   const el = document.getElementById(elementId);
@@ -15,11 +15,7 @@ async function exportElementAsPng(elementId: string, filename: string, mode: "ed
 
   const clone = el.cloneNode(true) as HTMLElement;
   clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-  if (mode === "transparent_clean") {
-    clone.style.background = "transparent";
-  } else {
-    clone.style.background = "#090A0F";
-  }
+  clone.style.background = mode === "transparent_clean" ? "transparent" : "#0F172A";
 
   const serialized = new XMLSerializer().serializeToString(clone);
   const svgData = `
@@ -42,7 +38,7 @@ async function exportElementAsPng(elementId: string, filename: string, mode: "ed
     if (ctx) {
       ctx.scale(2, 2);
       if (mode === "editorial_dark") {
-        ctx.fillStyle = "#090A0F";
+        ctx.fillStyle = "#0F172A";
         ctx.fillRect(0, 0, width, height);
       }
       ctx.drawImage(img, 0, 0, width, height);
@@ -57,171 +53,169 @@ async function exportElementAsPng(elementId: string, filename: string, mode: "ed
   img.src = url;
 }
 
-function getPercentileColor(pct: number): string {
-  if (pct >= 80) return "bg-emerald-500 text-emerald-300";
-  if (pct >= 60) return "bg-sky-500 text-sky-300";
-  if (pct >= 40) return "bg-amber-500 text-amber-300";
-  return "bg-rose-500 text-rose-300";
+function getBarColor(pct: number): string {
+  if (pct >= 80) return "bg-[#6EE7B7]"; // Hero Mint
+  if (pct >= 55) return "bg-[#38BDF8]"; // Sky Blue
+  return "bg-[#FF6350]"; // Warm Coral
+}
+
+function getPctTextColor(pct: number): string {
+  if (pct >= 80) return "text-[#6EE7B7]";
+  if (pct >= 55) return "text-[#38BDF8]";
+  return "text-[#FF6350]";
+}
+
+function ExportToolbar({
+  title,
+  exportMode,
+  setExportMode,
+  onDownload,
+}: {
+  title: string;
+  exportMode: "editorial_dark" | "transparent_clean";
+  setExportMode: (m: "editorial_dark" | "transparent_clean") => void;
+  onDownload: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-0.5 text-xs">
+      <span className="font-tech text-[10px] uppercase tracking-widest text-[#38BDF8]">{title}</span>
+      <div className="flex items-center gap-2">
+        <div className="inline-flex border border-[#334155] bg-[#0B1120] rounded p-0.5 font-tech text-[10px]">
+          <button
+            type="button"
+            onClick={() => setExportMode("editorial_dark")}
+            className={`px-2 py-0.5 rounded-sm transition-colors cursor-pointer ${
+              exportMode === "editorial_dark" ? "bg-[#1E293B] text-[#F8FAFC]" : "text-[#64748B] hover:text-[#CBD5E1]"
+            }`}
+          >
+            Editorial Dark
+          </button>
+          <button
+            type="button"
+            onClick={() => setExportMode("transparent_clean")}
+            className={`px-2 py-0.5 rounded-sm transition-colors cursor-pointer ${
+              exportMode === "transparent_clean"
+                ? "bg-[#6EE7B7]/20 text-[#6EE7B7]"
+                : "text-[#64748B] hover:text-[#CBD5E1]"
+            }`}
+          >
+            Transparent Clean
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={onDownload}
+          className="inline-flex items-center gap-1.5 rounded bg-[#6EE7B7] hover:bg-[#34D399] text-[#0F172A] px-2.5 py-1 font-tech text-[10px] font-bold transition-colors cursor-pointer"
+        >
+          <Download className="w-3 h-3" />
+          EXPORT PNG
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================================
-// 1. PLAYER SCOUTING & TWO-SEASON EVOLUTION CARD
+// 1. PLAYER SCOUTING & TWO-SEASON EVOLUTION CARD (Flat Editorial Hairline)
 // ============================================================================
 export function PlayerScoutingCard({ card }: { card: any }) {
   const [exportMode, setExportMode] = useState<"editorial_dark" | "transparent_clean">("editorial_dark");
-  const cardDomId = `scouting-card-${card.playerId}-${card.season.replace("/", "")}`;
+  const cardDomId = `scouting-card-${card.playerId}-${String(card.season).replace("/", "")}`;
 
   return (
     <div className="my-4 space-y-2">
-      {/* Toolbar: Export Mode Toggle + Download PNG */}
-      <div className="flex items-center justify-between px-1 text-xs">
-        <div className="inline-flex items-center gap-1.5 text-zinc-400">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-medium">Visual Report Template · Player Scouting & Evolution</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5">
-            <button
-              type="button"
-              onClick={() => setExportMode("editorial_dark")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-                exportMode === "editorial_dark" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Editorial Dark
-            </button>
-            <button
-              type="button"
-              onClick={() => setExportMode("transparent_clean")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-                exportMode === "transparent_clean" ? "bg-emerald-600/30 text-emerald-300" : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Transparent Clean
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => void exportElementAsPng(cardDomId, `halfspace-${card.shortName}`, exportMode)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer"
-          >
-            <Download className="w-3 h-3" />
-            Export PNG
-          </button>
-        </div>
-      </div>
+      <ExportToolbar
+        title="Visual Report • Player Scouting & Evolution"
+        exportMode={exportMode}
+        setExportMode={setExportMode}
+        onDownload={() => void exportElementAsPng(cardDomId, `halfspace-${card.shortName}`, exportMode)}
+      />
 
-      {/* Card Canvas */}
       <div
         id={cardDomId}
-        className={`rounded-2xl border p-5 transition-all ${
+        className={`border p-5 space-y-4 ${
           exportMode === "editorial_dark"
-            ? "bg-[#090A0F] border-zinc-800 shadow-2xl"
-            : "bg-transparent border-zinc-800/40"
+            ? "bg-[#0F172A] border-[#334155]"
+            : "bg-transparent border-[#334155]/40"
         }`}
       >
-        {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-zinc-800/80">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold tracking-tight text-white">{card.playerName}</h3>
-              <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {card.primaryPosition} ({card.positionSharePct}% role share)
+        {/* Editorial Header */}
+        <div className="flex flex-wrap items-baseline justify-between gap-4 pb-3 border-b border-[#334155]">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h3 className="font-editorial text-2xl font-bold tracking-tight text-[#F8FAFC]">
+                {card.playerName}
+              </h3>
+              <span className="font-tech text-[10px] px-1.5 py-0.5 border border-[#6EE7B7]/40 text-[#6EE7B7]">
+                {card.primaryPosition} ({card.positionSharePct}% SHARE)
               </span>
-              {card.isU23 ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500 text-zinc-950">
-                  U-23 ({card.age}y)
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-300">
-                  Senior ({card.age}y)
-                </span>
-              )}
-              <span
-                className={`px-2 py-0.5 text-[10px] font-semibold ${
-                  card.isLocal
-                    ? "rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                    : "rounded-sm bg-amber-500/15 text-amber-300 border border-dashed border-amber-500/40"
-                }`}
-              >
-                {card.isLocal ? "IDN (Local)" : `${card.nationality} (Foreign)`}
+              <span className="font-tech text-[10px] px-1.5 py-0.5 border border-[#334155] text-[#CBD5E1]">
+                {card.isU23 ? `U-23 (${card.age}y)` : `SENIOR (${card.age}y)`} •{" "}
+                {card.isLocal ? "IDN LOCAL" : `${card.nationality} FOREIGN`}
               </span>
             </div>
-            <p className="text-xs text-zinc-400 mt-1">
-              {card.teamName} • Liga 1 Season <span className="text-zinc-200 font-semibold">{card.season}</span>
-              {card.prevSeason ? (
-                <span>
-                  {" "}
-                  vs <span className="text-zinc-300 font-semibold">{card.prevSeason}</span> (2-Season Evolution)
-                </span>
-              ) : null}
+            <p className="text-xs text-[#94A3B8]">
+              {card.teamName} • Season <span className="text-[#F8FAFC] font-semibold">{card.season}</span>
+              {card.prevSeason ? ` vs ${card.prevSeason} (2-Season Evolution)` : ""}
             </p>
           </div>
 
-          <div className="text-right">
-            <div className="text-xs font-mono text-zinc-300">
-              <span className="text-emerald-400 font-bold">{card.minutesPlayed}</span> mins ({card.matchesPlayed} matches)
+          <div className="text-right font-tech text-[11px] tabular">
+            <div>
+              <span className="text-[#6EE7B7] font-bold">{card.minutesPlayed}</span> mins ({card.matchesPlayed} matches)
             </div>
             {card.earlySeasonSample && (
-              <span className="inline-block mt-1 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-semibold">
-                Early Season Sample (&gt;=180m rule)
-              </span>
+              <div className="text-[10px] text-[#FF6350] mt-0.5">EARLY SEASON SAMPLE (&ge;180m)</div>
             )}
             {card.lowSampleWarning && (
-              <span className="inline-block mt-1 px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-semibold">
-                Low Sample Warning (&lt;180m)
-              </span>
+              <div className="text-[10px] text-[#FF6350] mt-0.5">LOW SAMPLE WARNING (&lt;180m)</div>
             )}
           </div>
         </div>
 
-        {/* Metrics List with Dual Metric Naming & Percentile Bars */}
-        <div className="py-4 space-y-2.5">
+        {/* Hairline Metric Rows (Dual Metric Naming, Zero Nested Card Soup) */}
+        <div className="divide-y divide-[#334155]/70 border-b border-[#334155]">
           {(card.metrics ?? []).map((m: any) => {
-            const barClass = getPercentileColor(m.percentile).split(" ")[0];
             const hasPrev = typeof m.prevValuePer90 === "number" && typeof m.prevPercentile === "number";
             const delta = hasPrev ? Math.round((m.valuePer90 - m.prevValuePer90) * 100) / 100 : null;
 
             return (
-              <div key={m.key} className="grid grid-cols-12 items-center gap-3 text-xs">
-                {/* Dual Metric Label */}
+              <div key={m.key} className="py-2 grid grid-cols-12 items-center gap-3 text-xs">
                 <div className="col-span-5 min-w-0">
-                  <div className="font-semibold text-zinc-100 truncate">{m.tacticalLabel}</div>
-                  <div className="text-[10px] text-zinc-500 font-mono truncate">{m.technicalCode}</div>
+                  <div className="font-semibold text-[#F8FAFC] truncate">{m.tacticalLabel}</div>
+                  <div className="font-tech text-[10px] text-[#64748B] truncate">{m.technicalCode}</div>
                 </div>
 
-                {/* Percentile Bar + 2-Season Evolution Marker */}
                 <div className="col-span-4">
-                  <div className="relative h-2.5 w-full rounded-full bg-zinc-800/90 overflow-hidden">
+                  <div className="relative h-1.5 w-full bg-[#1E293B] rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${barClass}`}
+                      className={`h-full ${getBarColor(m.percentile)}`}
                       style={{ width: `${Math.max(4, m.percentile)}%` }}
                     />
                     {hasPrev && (
                       <div
-                        title={`Previous Season (${card.prevSeason}): ${m.prevPercentile}th pct`}
-                        className="absolute top-0 bottom-0 w-1 bg-white/90 shadow"
-                        style={{ left: `${Math.min(97, Math.max(2, m.prevPercentile))}%` }}
+                        title={`Previous Season (${card.prevSeason}): P${m.prevPercentile}`}
+                        className="absolute top-0 bottom-0 w-0.5 bg-[#F8FAFC]"
+                        style={{ left: `${Math.min(98, Math.max(2, m.prevPercentile))}%` }}
                       />
                     )}
                   </div>
                 </div>
 
-                {/* Tabular Values & Percentile Pill */}
-                <div className="col-span-3 flex items-center justify-end gap-2 font-mono tabular-nums">
+                <div className="col-span-3 flex items-center justify-end gap-2.5 font-tech tabular">
                   {hasPrev ? (
-                    <span className="text-[11px] text-zinc-400">
-                      {m.prevValuePer90} → <strong className="text-zinc-100">{m.valuePer90}</strong>
+                    <span className="text-[11px] text-[#94A3B8]">
+                      {m.prevValuePer90}&rarr;<strong className="text-[#F8FAFC]">{m.valuePer90}</strong>
                       {delta !== null && (
-                        <span className={delta >= 0 ? "text-emerald-400 ml-1" : "text-rose-400 ml-1"}>
+                        <span className={delta >= 0 ? "text-[#6EE7B7] ml-1" : "text-[#FF6350] ml-1"}>
                           ({delta >= 0 ? `+${delta}` : delta})
                         </span>
                       )}
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold text-zinc-200">{m.valuePer90}</span>
+                    <span className="text-xs font-bold text-[#F8FAFC]">{m.valuePer90}</span>
                   )}
-                  <span className="w-9 text-center py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-200">
+                  <span className={`w-8 text-right font-bold ${getPctTextColor(m.percentile)}`}>
                     P{m.percentile}
                   </span>
                 </div>
@@ -232,11 +226,11 @@ export function PlayerScoutingCard({ card }: { card: any }) {
 
         {/* Footer */}
         {exportMode === "editorial_dark" && (
-          <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="flex items-center justify-between font-tech text-[10px] text-[#64748B]">
             <span>
-              Benchmarked against {card.peerCount} Liga 1 {card.primaryPosition} peers • PAdj = per 500 opponent touches
+              BENCHMARK: {card.peerCount} {card.primaryPosition} PEERS • PADJ / 500 OPP. TOUCHES
             </span>
-            <span className="font-mono text-zinc-400">Halfspace Intelligence • PostgreSQL + RAG</span>
+            <span className="text-[#94A3B8]">HALFSPACE. • POSTGRESQL + RAG</span>
           </div>
         )}
       </div>
@@ -253,42 +247,27 @@ export function PrematchLineupCard({ card }: { card: any }) {
 
   const renderTeamHalf = (team: any, isAway: boolean) => (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-baseline justify-between border-b border-[#334155]/70 pb-2">
         <div>
-          <div className="text-sm font-bold text-white flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block"
-              style={{ backgroundColor: team.teamColor || "#10b981" }}
-            />
+          <div className="text-sm font-bold text-[#F8FAFC] flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: team.teamColor || "#6EE7B7" }} />
             {team.teamName}
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-800 text-emerald-300">
-              {team.predictedFormation}
-            </span>
+            <span className="font-tech text-[11px] text-[#6EE7B7]">{team.predictedFormation}</span>
           </div>
-          <div className="text-[11px] text-zinc-400 mt-0.5">
-            Form: <span className="font-mono text-zinc-200">{team.recentForm}</span> • Non-Pen xG:{" "}
-            <span className="text-emerald-400 font-semibold">{team.stats.nonPenXgPerMatch}</span>/match
+          <div className="font-tech text-[10px] text-[#94A3B8] mt-0.5 tabular">
+            FORM: {team.recentForm} • NP-xG: {team.stats.nonPenXgPerMatch}/m
           </div>
         </div>
-        <div className="text-right text-[10px]">
-          <div
-            className={`px-2 py-0.5 rounded font-semibold ${
-              team.quotaCheck.compliesWithLiga1Rules
-                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                : "bg-rose-500/20 text-rose-300"
-            }`}
-          >
-            U-23 Starter: {team.quotaCheck.u23StartersCount} • Foreign: {team.quotaCheck.foreignStartersCount}/6
-          </div>
+        <div className="font-tech text-[10px] text-[#6EE7B7]">
+          U-23: {team.quotaCheck.u23StartersCount} • FOREIGN: {team.quotaCheck.foreignStartersCount}/6
         </div>
       </div>
 
-      {/* SVG Pitch Diagram */}
-      <div className="relative h-64 w-full rounded-xl border border-emerald-900/50 bg-emerald-950/30 overflow-hidden">
-        {/* Pitch lines */}
-        <div className="absolute inset-2 border border-emerald-800/40 rounded-lg pointer-events-none" />
-        <div className="absolute top-2 bottom-2 left-1/2 w-px bg-emerald-800/40 pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border border-emerald-800/40 pointer-events-none" />
+      {/* Tactical Pitch Board */}
+      <div className="relative h-64 w-full border border-[#334155] bg-[#0B1120] overflow-hidden">
+        <div className="absolute inset-2 border border-[#334155]/60 pointer-events-none" />
+        <div className="absolute top-2 bottom-2 left-1/2 w-px bg-[#334155]/60 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border border-[#334155]/60 pointer-events-none" />
 
         {(team.startingXI ?? []).map((p: any) => {
           const leftPct = isAway ? 100 - p.x : p.x;
@@ -297,25 +276,25 @@ export function PrematchLineupCard({ card }: { card: any }) {
             <div
               key={p.playerId}
               style={{ left: `${leftPct}%`, top: `${p.y}%` }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center text-center group"
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center text-center"
             >
               <div
-                className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shadow-md border whitespace-nowrap ${
+                className={`px-1.5 py-0.5 text-[10px] font-bold border whitespace-nowrap ${
                   isDoubtful
-                    ? "bg-amber-500 text-zinc-950 border-amber-300"
+                    ? "bg-[#FF6350] text-[#0F172A] border-[#FCA5A5]"
                     : p.isU23
-                      ? "bg-emerald-500 text-zinc-950 border-emerald-300"
+                      ? "bg-[#6EE7B7] text-[#0F172A] border-[#A7F3D0]"
                       : !p.isLocal
-                        ? "bg-zinc-900 text-amber-300 border-dashed border-amber-400/70"
-                        : "bg-zinc-900/95 text-zinc-100 border-zinc-700"
+                        ? "bg-[#0F172A] text-[#38BDF8] border-dashed border-[#38BDF8]"
+                        : "bg-[#1E293B] text-[#F8FAFC] border-[#475569]"
                 }`}
               >
-                <span className="opacity-75 mr-1">{p.position}</span>
+                <span className="font-tech opacity-75 mr-1">{p.position}</span>
                 {p.shortName}
-                {p.isU23 && <span className="ml-1 text-[9px] underline">U23</span>}
+                {p.isU23 && <span className="ml-1 font-tech text-[9px]">U23</span>}
               </div>
               {isDoubtful && (
-                <div className="mt-0.5 px-1.5 py-0.2 rounded bg-amber-950/95 border border-amber-500/50 text-[9px] text-amber-200 whitespace-nowrap">
+                <div className="mt-0.5 px-1 bg-[#0F172A] border border-[#FF6350]/60 font-tech text-[9px] text-[#FF6350] whitespace-nowrap">
                   50/50 • Backup: {p.backupPlayerName}
                 </div>
               )}
@@ -324,17 +303,16 @@ export function PrematchLineupCard({ card }: { card: any }) {
         })}
       </div>
 
-      {/* Sidelined / Confirmed Out Strip */}
-      <div className="rounded-xl bg-zinc-900/70 border border-zinc-800/80 px-3 py-2 text-[11px]">
-        <span className="font-semibold text-rose-400 mr-2">Absen / Sidelined:</span>
+      {/* Sidelined Strip */}
+      <div className="border-t border-[#334155]/70 pt-2 text-[11px] text-[#CBD5E1]">
+        <span className="font-tech text-[10px] uppercase text-[#FF6350] font-bold mr-2">Absen:</span>
         {(team.sidelined ?? []).length === 0 ? (
-          <span className="text-zinc-400">Skuad inti fit (tidak ada skorsing/cedera terkonfirmasi)</span>
+          <span className="text-[#64748B]">Skuad inti fit</span>
         ) : (
-          (team.sidelined ?? []).map((s: any, idx: number) => (
-            <span key={s.playerName} className="text-zinc-300 mr-3">
-              • <strong>{s.playerName}</strong> ({s.reason}){" "}
-              <code className="text-[10px] text-emerald-400">[{s.citationDocId}]</code>
-              {idx < team.sidelined.length - 1 ? " " : ""}
+          (team.sidelined ?? []).map((s: any) => (
+            <span key={s.playerName} className="mr-3">
+              <strong>{s.playerName}</strong> ({s.reason}){" "}
+              <code className="font-tech text-[10px] text-[#6EE7B7]">[{s.citationDocId}]</code>
             </span>
           ))
         )}
@@ -344,92 +322,62 @@ export function PrematchLineupCard({ card }: { card: any }) {
 
   return (
     <div className="my-4 space-y-2">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-1 text-xs">
-        <div className="inline-flex items-center gap-1.5 text-zinc-400">
-          <Layers className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-medium">Visual Report Template · Pre-Match Tactical & Predicted XI Board</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5">
-            <button
-              type="button"
-              onClick={() => setExportMode("editorial_dark")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium cursor-pointer ${
-                exportMode === "editorial_dark" ? "bg-zinc-800 text-white" : "text-zinc-400"
-              }`}
-            >
-              Editorial Dark
-            </button>
-            <button
-              type="button"
-              onClick={() => setExportMode("transparent_clean")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium cursor-pointer ${
-                exportMode === "transparent_clean" ? "bg-emerald-600/30 text-emerald-300" : "text-zinc-400"
-              }`}
-            >
-              Transparent Clean
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => void exportElementAsPng(cardDomId, "halfspace-prematch-xi", exportMode)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 text-[11px] font-medium cursor-pointer"
-          >
-            <Download className="w-3 h-3" />
-            Export PNG
-          </button>
-        </div>
-      </div>
+      <ExportToolbar
+        title="Visual Report • Pre-Match Tactical & Predicted XI"
+        exportMode={exportMode}
+        setExportMode={setExportMode}
+        onDownload={() => void exportElementAsPng(cardDomId, "halfspace-prematch-xi", exportMode)}
+      />
 
-      {/* Canvas */}
       <div
         id={cardDomId}
-        className={`rounded-2xl border p-5 space-y-4 ${
-          exportMode === "editorial_dark" ? "bg-[#090A0F] border-zinc-800 shadow-2xl" : "bg-transparent border-zinc-800/40"
+        className={`border p-5 space-y-4 ${
+          exportMode === "editorial_dark"
+            ? "bg-[#0F172A] border-[#334155]"
+            : "bg-transparent border-[#334155]/40"
         }`}
       >
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3 border-b border-[#334155]">
           <div>
-            <h3 className="text-base font-bold text-white">{card.matchLabel}</h3>
-            <p className="text-xs text-zinc-400">
-              Predicted Starting XI • News Injury/Doubtful Check • PSSI/LIB Quota Verified [reg-liga1-u23-2627]
+            <h3 className="font-editorial text-xl font-bold text-[#F8FAFC]">{card.matchLabel}</h3>
+            <p className="font-tech text-[10px] text-[#94A3B8] mt-0.5">
+              PREDICTED STARTING XI • NEWS INJURY/DOUBTFUL CHECK • QUOTA VERIFIED [reg-liga1-u23-2627]
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[10px]">
-            <span className="px-2 py-0.5 rounded bg-emerald-500 text-zinc-950 font-bold">Green = U-23 Mandatory</span>
-            <span className="px-2 py-0.5 rounded bg-amber-500 text-zinc-950 font-bold">Yellow = 50/50 Doubtful + Backup</span>
+          <div className="flex items-center gap-3 font-tech text-[10px]">
+            <span className="text-[#6EE7B7]">■ U-23 MANDATORY</span>
+            <span className="text-[#FF6350]">■ 50/50 DOUBTFUL + BACKUP</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {renderTeamHalf(card.homeTeam, false)}
           {renderTeamHalf(card.awayTeam, true)}
         </div>
 
-        {/* Head-to-Head Metric Comparison Strip */}
-        <div className="grid grid-cols-4 gap-3 pt-2 border-t border-zinc-800/80 text-center text-xs">
-          <div className="rounded-xl bg-zinc-900/60 p-2.5">
-            <div className="text-[10px] text-zinc-400">Open-Play xG / Match</div>
-            <div className="font-mono font-bold text-zinc-100 mt-0.5">
+        {/* Hairline H2H Metric Row */}
+        <div className="grid grid-cols-4 divide-x divide-[#334155] border-t border-[#334155] pt-3 text-center font-tech tabular">
+          <div className="px-2">
+            <div className="text-[10px] text-[#64748B]">OPEN-PLAY xG/M</div>
+            <div className="text-xs font-bold text-[#F8FAFC] mt-0.5">
               {card.homeTeam.stats.openPlayXgPerMatch} vs {card.awayTeam.stats.openPlayXgPerMatch}
             </div>
           </div>
-          <div className="rounded-xl bg-zinc-900/60 p-2.5">
-            <div className="text-[10px] text-zinc-400">Set-Piece xG / Match</div>
-            <div className="font-mono font-bold text-zinc-100 mt-0.5">
+          <div className="px-2">
+            <div className="text-[10px] text-[#64748B]">SET-PIECE xG/M</div>
+            <div className="text-xs font-bold text-[#F8FAFC] mt-0.5">
               {card.homeTeam.stats.setPieceXgPerMatch} vs {card.awayTeam.stats.setPieceXgPerMatch}
             </div>
           </div>
-          <div className="rounded-xl bg-zinc-900/60 p-2.5">
-            <div className="text-[10px] text-zinc-400">Attacking 3rd Touch Share</div>
-            <div className="font-mono font-bold text-zinc-100 mt-0.5">
+          <div className="px-2">
+            <div className="text-[10px] text-[#64748B]">ATT 3RD SHARE</div>
+            <div className="text-xs font-bold text-[#38BDF8] mt-0.5">
               {card.homeTeam.stats.att3rdTouchSharePct}% vs {card.awayTeam.stats.att3rdTouchSharePct}%
             </div>
           </div>
-          <div className="rounded-xl bg-zinc-900/60 p-2.5">
-            <div className="text-[10px] text-zinc-400">PAdj Defensive Intensity</div>
-            <div className="font-mono font-bold text-zinc-100 mt-0.5">
+          <div className="px-2">
+            <div className="text-[10px] text-[#64748B]">PADJ DEFENSE</div>
+            <div className="text-xs font-bold text-[#6EE7B7] mt-0.5">
               {card.homeTeam.stats.padjDefensiveActions} vs {card.awayTeam.stats.padjDefensiveActions}
             </div>
           </div>
@@ -440,7 +388,7 @@ export function PrematchLineupCard({ card }: { card: any }) {
 }
 
 // ============================================================================
-// 3. PEER COMPARISON CARD (Adaptive: 2 Players = Head-to-Head Bars, >=3 = 2D Scatter Quadrant)
+// 3. PEER COMPARISON CARD (2D Scatter Quadrant + Dense Tabular Cohort)
 // ============================================================================
 export function PeerComparisonCard({ card }: { card: any }) {
   const [exportMode, setExportMode] = useState<"editorial_dark" | "transparent_clean">("editorial_dark");
@@ -452,96 +400,57 @@ export function PeerComparisonCard({ card }: { card: any }) {
 
   return (
     <div className="my-4 space-y-2">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-1 text-xs">
-        <div className="inline-flex items-center gap-1.5 text-zinc-400">
-          <Eye className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-medium">
-            Visual Report Template ·{" "}
-            {card.mode === "head_to_head_bars" ? "Head-to-Head Comparison" : "2D Scouting Scatter Quadrant"}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5">
-            <button
-              type="button"
-              onClick={() => setExportMode("editorial_dark")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium cursor-pointer ${
-                exportMode === "editorial_dark" ? "bg-zinc-800 text-white" : "text-zinc-400"
-              }`}
-            >
-              Editorial Dark
-            </button>
-            <button
-              type="button"
-              onClick={() => setExportMode("transparent_clean")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium cursor-pointer ${
-                exportMode === "transparent_clean" ? "bg-emerald-600/30 text-emerald-300" : "text-zinc-400"
-              }`}
-            >
-              Transparent Clean
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => void exportElementAsPng(cardDomId, "halfspace-peer-comparison", exportMode)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 text-[11px] font-medium cursor-pointer"
-          >
-            <Download className="w-3 h-3" />
-            Export PNG
-          </button>
-        </div>
-      </div>
+      <ExportToolbar
+        title={`Visual Report • ${card.mode === "head_to_head_bars" ? "Head-to-Head" : "2D Scouting Quadrant"}`}
+        exportMode={exportMode}
+        setExportMode={setExportMode}
+        onDownload={() => void exportElementAsPng(cardDomId, "halfspace-peer-comparison", exportMode)}
+      />
 
-      {/* Canvas */}
       <div
         id={cardDomId}
-        className={`rounded-2xl border p-5 space-y-4 ${
-          exportMode === "editorial_dark" ? "bg-[#090A0F] border-zinc-800 shadow-2xl" : "bg-transparent border-zinc-800/40"
+        className={`border p-5 space-y-4 ${
+          exportMode === "editorial_dark"
+            ? "bg-[#0F172A] border-[#334155]"
+            : "bg-transparent border-[#334155]/40"
         }`}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-800/80">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3 border-b border-[#334155]">
           <div>
-            <h3 className="text-base font-bold text-white">{card.title}</h3>
-            <p className="text-xs text-zinc-400">{card.subtitle}</p>
+            <h3 className="font-editorial text-xl font-bold text-[#F8FAFC]">{card.title}</h3>
+            <p className="font-tech text-[10px] text-[#94A3B8] mt-0.5">{card.subtitle}</p>
           </div>
-          <div className="flex items-center gap-2 text-[10px]">
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-zinc-950 font-bold">Emerald Pill = U-23</span>
-            <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/40">
-              Solid Pill = Local (IDN)
-            </span>
-            <span className="px-2 py-0.5 rounded-sm bg-amber-500/15 text-amber-300 border border-dashed border-amber-400/50">
-              Dashed Box = Foreign
-            </span>
+          <div className="flex items-center gap-3 font-tech text-[10px]">
+            <span className="text-[#6EE7B7]">● U-23</span>
+            <span className="text-[#38BDF8]">● LOCAL (IDN)</span>
+            <span className="text-[#FF6350]">□ FOREIGN (DASHED)</span>
           </div>
         </div>
 
-        {/* 2D Scatter Quadrant */}
-        <div className="relative h-72 w-full rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 overflow-hidden">
-          {/* Quadrant Median Dashed Lines */}
+        {/* 2D Quadrant Canvas */}
+        <div className="relative h-72 w-full border border-[#334155] bg-[#0B1120] p-4 overflow-hidden">
           <div
             style={{ left: `${Math.min(85, Math.max(15, (card.xMedian / maxX) * 100))}%` }}
-            className="absolute top-0 bottom-0 border-l border-dashed border-zinc-700/80 pointer-events-none"
+            className="absolute top-0 bottom-0 border-l border-dashed border-[#334155] pointer-events-none"
           />
           <div
             style={{ bottom: `${Math.min(85, Math.max(15, (card.yMedian / maxY) * 100))}%` }}
-            className="absolute left-0 right-0 border-t border-dashed border-zinc-700/80 pointer-events-none"
+            className="absolute left-0 right-0 border-t border-dashed border-[#334155] pointer-events-none"
           />
 
-          {/* Quadrant Watermark Labels */}
-          <div className="absolute top-2 right-3 text-[10px] font-semibold text-emerald-400/70">
-            ELITE TWO-WAY (High Progression + High PAdj Defense)
+          <div className="absolute top-2 right-3 font-tech text-[10px] text-[#6EE7B7]">
+            ELITE TWO-WAY (PROGRESSION + PADJ DEF)
           </div>
-          <div className="absolute bottom-2 left-3 text-[10px] text-zinc-500">
-            X: {card.xAxisLabel} ({card.xAxisCode}) →
+          <div className="absolute bottom-2 left-3 font-tech text-[10px] text-[#64748B]">
+            X: {card.xAxisLabel} ({card.xAxisCode}) &rarr;
           </div>
-          <div className="absolute top-2 left-3 text-[10px] text-zinc-500">
-            ↑ Y: {card.yAxisLabel} ({card.yAxisCode})
+          <div className="absolute top-2 left-3 font-tech text-[10px] text-[#64748B]">
+            &uarr; Y: {card.yAxisLabel}
           </div>
 
           {players.map((p: any, idx: number) => {
-            const xPct = Math.min(90, Math.max(8, (Number(p.xValue) / maxX) * 88 + (idx % 3) * 2));
-            const yPct = Math.min(88, Math.max(12, (Number(p.yValue) / maxY) * 84 + (idx % 2) * 3));
+            const xPct = Math.min(88, Math.max(10, (Number(p.xValue) / maxX) * 86 + (idx % 3) * 2));
+            const yPct = Math.min(86, Math.max(14, (Number(p.yValue) / maxY) * 82 + (idx % 2) * 3));
 
             return (
               <div
@@ -550,51 +459,51 @@ export function PeerComparisonCard({ card }: { card: any }) {
                 className="absolute -translate-x-1/2 translate-y-1/2"
               >
                 <div
-                  className={`px-2 py-0.5 text-[10px] font-bold shadow-lg whitespace-nowrap transition-transform hover:scale-110 ${
+                  className={`px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${
                     p.isLocal ? "rounded-full border" : "rounded-none border border-dashed"
                   } ${
                     p.isU23
-                      ? "bg-emerald-500 text-zinc-950 border-emerald-200"
+                      ? "bg-[#6EE7B7] text-[#0F172A] border-[#A7F3D0]"
                       : p.isFocal
-                        ? "bg-sky-500 text-zinc-950 border-white"
-                        : "bg-zinc-900/95 text-zinc-200 border-zinc-600"
+                        ? "bg-[#38BDF8] text-[#0F172A] border-[#F8FAFC]"
+                        : "bg-[#1E293B] text-[#F8FAFC] border-[#475569]"
                   }`}
                 >
-                  {p.shortName} <span className="opacity-75 font-mono">({p.xValue}, {p.yValue})</span>
+                  {p.shortName} <span className="font-tech opacity-80">({p.xValue}, {p.yValue})</span>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Summary Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        {/* Dense Tabular Cohort Table */}
+        <div className="overflow-x-auto border-t border-[#334155]">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-zinc-800 text-[10px] uppercase text-zinc-400">
+              <tr className="border-b border-[#334155] font-tech text-[10px] uppercase text-[#64748B]">
                 <th className="py-2 px-2">Player</th>
                 <th className="py-2 px-2">Club</th>
                 <th className="py-2 px-2">Role / Age</th>
                 <th className="py-2 px-2 text-right">Mins</th>
-                <th className="py-2 px-2 text-right">Acc. Long Balls/90</th>
-                <th className="py-2 px-2 text-right">Key Passes/90</th>
-                <th className="py-2 px-2 text-right">PAdj Defense</th>
+                <th className="py-2 px-2 text-right">accurate_long_balls</th>
+                <th className="py-2 px-2 text-right">key_passes_p90</th>
+                <th className="py-2 px-2 text-right">padj500_def</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
-              {players.slice(0, 6).map((p: any) => (
-                <tr key={p.playerId} className="hover:bg-zinc-900/50">
-                  <td className="py-1.5 px-2 font-sans font-semibold text-zinc-100">{p.playerName}</td>
-                  <td className="py-1.5 px-2 font-sans text-zinc-400">{p.teamName}</td>
-                  <td className="py-1.5 px-2 font-sans">
-                    <span className="text-emerald-400 font-semibold">{p.position}</span> • {p.age}y ({p.nationality})
+            <tbody className="divide-y divide-[#334155]/60 font-tech text-[11px] tabular">
+              {players.slice(0, 8).map((p: any) => (
+                <tr key={p.playerId} className="hover:bg-[#1E293B]/40">
+                  <td className="py-1.5 px-2 font-data font-semibold text-[#F8FAFC]">{p.playerName}</td>
+                  <td className="py-1.5 px-2 font-data text-[#94A3B8]">{p.teamName}</td>
+                  <td className="py-1.5 px-2 text-[#CBD5E1]">
+                    <span className="text-[#6EE7B7]">{p.position}</span> • {p.age}y ({p.nationality})
                   </td>
-                  <td className="py-1.5 px-2 text-right text-zinc-300">{p.minutesPlayed}</td>
-                  <td className="py-1.5 px-2 text-right text-emerald-300">
+                  <td className="py-1.5 px-2 text-right text-[#CBD5E1]">{p.minutesPlayed}</td>
+                  <td className="py-1.5 px-2 text-right text-[#6EE7B7]">
                     {p.metrics?.["Acc. Long Balls / 90"] ?? p.xValue}
                   </td>
-                  <td className="py-1.5 px-2 text-right text-sky-300">{p.metrics?.["Key Passes / 90"] ?? 0}</td>
-                  <td className="py-1.5 px-2 text-right text-amber-300">
+                  <td className="py-1.5 px-2 text-right text-[#38BDF8]">{p.metrics?.["Key Passes / 90"] ?? 0}</td>
+                  <td className="py-1.5 px-2 text-right text-[#F8FAFC]">
                     {p.metrics?.["PAdj Total Defense"] ?? p.yValue}
                   </td>
                 </tr>
