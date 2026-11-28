@@ -165,7 +165,7 @@ export function ChatScreen({ sessionId, initialMessages = [] }: ChatScreenProps)
                 Ready for Brief
               </div>
               <h2 className="font-editorial text-xl font-bold text-[#F8FAFC]">
-                Tanyakan Scouting, Pre-Match Lineup, atau Visual Report
+                Tanyakan Team Style, Pre-Match XI, Scouting, atau Laporan Pemain
               </h2>
               <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
                 Data ditarik langsung dari PostgreSQL (8 Liga / 23 Musim) dan Hybrid News &amp; Regulation RAG.
@@ -196,7 +196,7 @@ export function ChatScreen({ sessionId, initialMessages = [] }: ChatScreenProps)
                           }
                           if (part.type === "text") {
                             return (
-                              <MessagePrimitive.Markdown className="prose prose-invert max-w-none space-y-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#38BDF8] [&_a]:underline [&_code]:font-tech [&_code]:bg-[#1E293B] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-[#6EE7B7] [&_pre]:bg-[#0B1120] [&_pre]:border [&_pre]:border-[#334155] [&_pre]:p-3.5 [&_pre]:rounded [&_pre]:overflow-x-auto [&_h1]:font-editorial [&_h1]:text-xl [&_h1]:font-bold [&_h2]:font-editorial [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-[#334155] [&_th]:py-1.5 [&_th]:text-left [&_th]:font-tech [&_th]:text-xs [&_td]:border-b [&_td]:border-[#334155]/50 [&_td]:py-1.5 [&_td]:text-xs">
+                              <MessagePrimitive.Markdown className="prose prose-invert max-w-none space-y-3 [&_img]:hidden [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#38BDF8] [&_a]:underline [&_code]:font-tech [&_code]:bg-[#1E293B] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-[#6EE7B7] [&_pre]:bg-[#0B1120] [&_pre]:border [&_pre]:border-[#334155] [&_pre]:p-3.5 [&_pre]:rounded [&_pre]:overflow-x-auto [&_h1]:font-editorial [&_h1]:text-xl [&_h1]:font-bold [&_h2]:font-editorial [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-[#334155] [&_th]:py-1.5 [&_th]:text-left [&_th]:font-tech [&_th]:text-xs [&_td]:border-b [&_td]:border-[#334155]/50 [&_td]:py-1.5 [&_td]:text-xs">
                                 {part.text}
                               </MessagePrimitive.Markdown>
                             );

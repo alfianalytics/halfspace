@@ -9,10 +9,17 @@ import {
   runHybridNewsSyncWorkflow,
 } from "@halfspace/agents";
 import {
+  buildStudioPlayerCard,
+  buildStudioPlayerRanking,
+  buildStudioPlayerScatter,
+  buildStudioTeamScatter,
   ensureHalfspaceSchema,
+  fetchLeagueTeamStyles,
   fetchSeasonPlayerCohort,
   getFeaturedLiga1Fixtures,
   getLastNewsSyncDate,
+  getStudioOptions,
+  getTeamStyleProfile,
   memoryStore,
 } from "@halfspace/db";
 import { createLiga1McpServer } from "@halfspace/mcp-server";
@@ -25,11 +32,12 @@ await ensureHalfspaceSchema();
 void Promise.all([
   fetchSeasonPlayerCohort("26/27").catch(() => []),
   fetchSeasonPlayerCohort("25/26").catch(() => []),
+  fetchLeagueTeamStyles(1015, "26/27").catch(() => []),
+  fetchLeagueTeamStyles(1015, "25/26").catch(() => []),
 ]);
 
 const app = new Hono();
 
-// Expose x-anvia-stream-protocol header so @anvia/client in the browser can read the stream (Day 13 Slide 3)
 app.use(
   "*",
   cors({
@@ -42,9 +50,9 @@ app.use(
 app.get("/", (c) =>
   c.json({
     name: "halfspace-api",
-    product: "Halfspace — Indonesia Super League Intelligence & Visual Report Assistant",
+    product: "Halfspace — Football Intelligence & Visual Studio",
     status: "ok",
-    lastNewsSyncDate: getLastNewsSyncDate() || "2026-11-25",
+    lastNewsSyncDate: getLastNewsSyncDate() || "2026-11-28",
     mcpEndpoint: "/mcp",
   }),
 );
@@ -63,10 +71,128 @@ app.get("/api/fixtures", async (c) => {
   return c.json({ fixtures });
 });
 
-// Hybrid News Sync Workflow Endpoint (Manual UI Trigger + Status)
+// ============================================================================
+// INTERACTIVE VISUAL STUDIO ENDPOINTS (`/api/studio/*`)
+// ============================================================================
+
+app.get("/api/studio/options", async (c) => {
+  const league = c.req.query("league") || "Liga 1";
+  const season = c.req.query("season") || "26/27";
+  const data = await getStudioOptions(league, season);
+  return c.json(data);
+});
+
+app.get("/api/studio/player-card", async (c) => {
+  const playerId = c.req.query("playerId") ? Number(c.req.query("playerId")) : undefined;
+  const playerName = c.req.query("playerName");
+  const league = c.req.query("league") || "Liga 1";
+  const season = c.req.query("season") || "26/27";
+  const compareSeason = c.req.query("compareSeason") || "25/26";
+  const positionGroup = c.req.query("positionGroup") || "AUTO";
+  const minMinutes = c.req.query("minMinutes") ? Number(c.req.query("minMinutes")) : undefined;
+  const metricsParam = c.req.query("metrics");
+  const metricKeys = metricsParam ? metricsParam.split(",").filter(Boolean) : undefined;
+
+  const card = await buildStudioPlayerCard({
+    playerId,
+    playerName,
+    league,
+    season,
+    compareSeason,
+    positionGroup,
+    minMinutes,
+    metricKeys,
+  });
+  if (!card) return c.json({ error: "Player not found for selected filters" }, 404);
+  return c.json({ card });
+});
+
+app.get("/api/studio/player-scatter", async (c) => {
+  const league = c.req.query("league") || "Liga 1";
+  const season = c.req.query("season") || "26/27";
+  const xMetric = c.req.query("xMetric") || "accurateLongBallsPer90";
+  const yMetric = c.req.query("yMetric") || "padjInterceptions";
+  const positionGroup = c.req.query("positionGroup") || "CM";
+  const ageGroup = (c.req.query("ageGroup") as "All" | "U23" | "Senior") || "All";
+  const nationality = (c.req.query("nationality") as "All" | "Local" | "Foreign") || "All";
+  const minMinutes = c.req.query("minMinutes") ? Number(c.req.query("minMinutes")) : undefined;
+  const focalPlayerId = c.req.query("focalPlayerId") ? Number(c.req.query("focalPlayerId")) : undefined;
+  const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 24;
+
+  const card = await buildStudioPlayerScatter({
+    league,
+    season,
+    xMetric,
+    yMetric,
+    positionGroup,
+    ageGroup,
+    nationality,
+    minMinutes,
+    focalPlayerId,
+    limit,
+  });
+  return c.json({ card });
+});
+
+app.get("/api/studio/player-ranking", async (c) => {
+  const league = c.req.query("league") || "Liga 1";
+  const season = c.req.query("season") || "26/27";
+  const metricKey = c.req.query("metricKey") || "nonPenXgPer90";
+  const positionGroup = c.req.query("positionGroup") || "ALL";
+  const ageGroup = (c.req.query("ageGroup") as "All" | "U23" | "Senior") || "All";
+  const nationality = (c.req.query("nationality") as "All" | "Local" | "Foreign") || "All";
+  const minMinutes = c.req.query("minMinutes") ? Number(c.req.query("minMinutes")) : undefined;
+  const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 15;
+  const ascending = c.req.query("ascending") === "true";
+
+  const card = await buildStudioPlayerRanking({
+    league,
+    season,
+    metricKey,
+    positionGroup,
+    ageGroup,
+    nationality,
+    minMinutes,
+    limit,
+    ascending,
+  });
+  return c.json({ card });
+});
+
+app.get("/api/studio/team-style", async (c) => {
+  const teamName = c.req.query("teamName") || "Persib Bandung";
+  const league = c.req.query("league") || "Liga 1";
+  const season = c.req.query("season") || "26/27";
+  const res = await getTeamStyleProfile({ teamName, league, season });
+  if (!res.found || !res.card) {
+    return c.json({ error: res.message || "Team not found" }, 404);
+  }
+  return c.json({ card: res.card });
+});
+
+app.get("/api/studio/team-scatter", async (c) => {
+  const league = c.req.query("league") || "Liga 1";
+  const season = c.req.query("season") || "26/27";
+  const xMetricId = c.req.query("xMetricId") || "possession";
+  const yMetricId = c.req.query("yMetricId") || "open_play_attack";
+  const situation = (c.req.query("situation") as "All" | "Home" | "Away" | "Last 6") || "All";
+  const focalTeamId = c.req.query("focalTeamId") ? Number(c.req.query("focalTeamId")) : undefined;
+
+  const card = await buildStudioTeamScatter({
+    league,
+    season,
+    xMetricId,
+    yMetricId,
+    situation,
+    focalTeamId,
+  });
+  return c.json({ card });
+});
+
+// Hybrid News Sync Workflow Endpoint
 app.get("/api/news/status", (c) =>
   c.json({
-    lastSyncDate: getLastNewsSyncDate() || "2026-11-25",
+    lastSyncDate: getLastNewsSyncDate() || "2026-11-28",
   }),
 );
 
@@ -79,7 +205,7 @@ app.post("/api/news/sync", async (c) => {
   return c.json(res);
 });
 
-// In-App Trace Summary Endpoint (Observability fallback when Docker Lens is offline)
+// In-App Trace Summary Endpoint
 app.get("/api/traces", (c) => {
   const sessionId = c.req.query("sessionId");
   return c.json({ traces: getRecentTraces(sessionId) });
@@ -117,7 +243,7 @@ app.post("/api/chat", async (c) => {
   return createClientStreamResponse({ events });
 });
 
-// Session History Endpoints (`GET /api/session`, `GET /api/session/:id`, `DELETE /api/session/:id`)
+// Session History Endpoints
 app.get("/api/session", async (c) => {
   const sessions = await memoryStore.listSessions(50);
   return c.json({ sessions });
@@ -146,8 +272,9 @@ const port = Number(process.env.PORT ?? 8000);
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`========================================================`);
-  console.log(`🚀 Halfspace API & MCP Server listening on http://localhost:${info.port}`);
+  console.log(`🚀 Halfspace API, Studio & MCP Server listening on http://localhost:${info.port}`);
   console.log(`   Chat Stream: POST http://localhost:${info.port}/api/chat`);
+  console.log(`   Studio API:  GET  http://localhost:${info.port}/api/studio/options`);
   console.log(`   MCP Server:  POST http://localhost:${info.port}/mcp`);
   console.log(`========================================================`);
 });

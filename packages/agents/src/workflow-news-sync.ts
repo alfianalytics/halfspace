@@ -3,6 +3,7 @@ import {
   PeerComparisonCardSchema,
   PlayerScoutingCardSchema,
   PrematchLineupCardSchema,
+  TeamStyleProfileCardSchema,
   type RagDocument,
   upsertRagDocuments,
 } from "@halfspace/db";
@@ -36,7 +37,7 @@ const LIGA1_CLUBS = [
  * and sets sample-size & proxy-metric instructions before the agent runs.
  */
 export function runPreflightWorkflow(userPrompt: string): {
-  detectedMode: "scouting" | "prematch" | "visual_report" | "out_of_scope" | "general_analytics";
+  detectedMode: "scouting" | "prematch" | "team_style" | "visual_report" | "out_of_scope" | "general_analytics";
   detectedClubs: string[];
   minMinutesRule: string;
   methodologyGuardrails: string[];
@@ -54,13 +55,15 @@ export function runPreflightWorkflow(userPrompt: string): {
       lower,
     );
 
-  let detectedMode: "scouting" | "prematch" | "visual_report" | "out_of_scope" | "general_analytics" =
+  let detectedMode: "scouting" | "prematch" | "team_style" | "visual_report" | "out_of_scope" | "general_analytics" =
     "general_analytics";
 
   if (isOutOfScope) {
     detectedMode = "out_of_scope";
   } else if (/prematch|pre-match|starting xi|lineup|susunan pemain|prediksi lineup|vs\b|lawan/i.test(lower)) {
     detectedMode = "prematch";
+  } else if (/gaya main|team style|playing style|strength|weakness|kelebihan|kelemahan|kekuatan|pemain kunci|key player|profil tim|taktik tim/i.test(lower)) {
+    detectedMode = "team_style";
   } else if (/report|evolusi|2 musim|dua musim|card|visual|perbandingan|bandingkan/i.test(lower)) {
     detectedMode = "visual_report";
   } else if (/scout|carikan|cari pemain|rekomendasi|gelandang|bek|striker|kiper|u-?23|u23/i.test(lower)) {
@@ -100,7 +103,7 @@ export function runPreflightWorkflow(userPrompt: string): {
  * WORKFLOW STEP 2: Deterministic Visual Report Schema Validator
  */
 export function validateVisualCardPayload(
-  type: "player_scouting" | "prematch_lineup" | "peer_comparison",
+  type: "player_scouting" | "prematch_lineup" | "peer_comparison" | "team_style_profile",
   payload: unknown,
 ) {
   if (type === "player_scouting") {
@@ -108,6 +111,9 @@ export function validateVisualCardPayload(
   }
   if (type === "prematch_lineup") {
     return PrematchLineupCardSchema.parse(payload);
+  }
+  if (type === "team_style_profile") {
+    return TeamStyleProfileCardSchema.parse(payload);
   }
   return PeerComparisonCardSchema.parse(payload);
 }

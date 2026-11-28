@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Calendar, Send } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, ArrowUpRight, Calendar, Send, SlidersHorizontal } from "lucide-react";
 import { newSessionId, setPendingMessage } from "../lib/pending-message";
 
 const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -21,9 +21,9 @@ async function loadFixtures(): Promise<FixtureItem[]> {
     return data.fixtures ?? [];
   } catch {
     return [
-      { matchId: 1, homeTeam: "Persib Bandung", awayTeam: "Persija Jakarta", round: 12, scoreLabel: "Big Match" },
-      { matchId: 2, homeTeam: "Persebaya Surabaya", awayTeam: "Borneo FC", round: 12, scoreLabel: "Big Match" },
-      { matchId: 3, homeTeam: "Bali United", awayTeam: "PSM Makassar", round: 12, scoreLabel: "Big Match" },
+      { matchId: 1, homeTeam: "Persib Bandung", awayTeam: "Persija Jakarta", round: 12, scoreLabel: "Upcoming" },
+      { matchId: 2, homeTeam: "Persebaya Surabaya", awayTeam: "Borneo FC", round: 12, scoreLabel: "Upcoming" },
+      { matchId: 3, homeTeam: "Bali United", awayTeam: "PSM Makassar", round: 12, scoreLabel: "Upcoming" },
     ];
   }
 }
@@ -33,50 +33,37 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-type WorkModeKey = "scouting" | "prematch" | "report";
-
-const WORK_MODES: Record<
-  WorkModeKey,
+const INSPIRATION_PROMPTS = [
   {
-    tabLabel: string;
-    toolTag: string;
-    guardrailNote: string;
-    samplePrompt: string;
-  }
-> = {
-  scouting: {
-    tabLabel: "01 · Scouting",
-    toolTag: "scout_players",
-    guardrailNote: "Guardrail: >=450 mins • >=35% true position • PAdj / 500 opp. touches",
-    samplePrompt:
-      "Carikan gelandang tengah (CM) U-23 lokal di Liga 1 musim 25/26 yang unggul dalam progresi bola (accurate_long_balls) dan pertahanan PAdj, lalu tampilkan visual peer comparison card-nya.",
+    category: "TEAM STYLE & KEY PLAYERS",
+    label: "Bedah gaya main, kekuatan/kelemahan & key players Persib Bandung",
+    prompt:
+      "Bedah playing style, strengths & weaknesses, formasi dominan, serta key players (top threats & creators) Persib Bandung di Liga 1 musim ini lengkap dengan kartu matriks 24 metriknya.",
   },
-  prematch: {
-    tabLabel: "02 · Pre-Match XI",
-    toolTag: "get_prematch_context",
-    guardrailNote: "Guardrail: RAG Berita Cedera & 50/50 Doubtful + Kuota U-23 & Asing",
-    samplePrompt:
-      "Analisis prematch Persib Bandung vs Persija Jakarta minggu ini dan prediksi Starting XI kedua tim berdasarkan berita cedera/akumulasi kartu terbaru beserta visual pitch board-nya.",
+  {
+    category: "PRE-MATCH & PREDICTED XI",
+    label: "Analisis taktik & prediksi Starting XI Persib vs Persija (cek cedera & kuota U-23)",
+    prompt:
+      "Analisis prematch Persib Bandung vs Persija Jakarta dan prediksi Starting XI kedua tim berdasarkan berita cedera/akumulasi kartu terbaru serta aturan kuota U-23.",
   },
-  report: {
-    tabLabel: "03 · 2-Season Report",
-    toolTag: "get_player_report_data",
-    guardrailNote: "Guardrail: >=180 mins Early Season Sample (26/27) vs Full Season (25/26)",
-    samplePrompt:
-      "Buatkan visual report scouting dan perbandingan evolusi dua musim (25/26 vs 26/27) untuk Marc Klok lengkap dengan persentil dan analisis taktiknya.",
+  {
+    category: "SCOUTING & PEER QUADRANT",
+    label: "Cari gelandang tengah (CM) U-23 lokal Liga 1 dengan progresi & PAdj defense terbaik",
+    prompt:
+      "Carikan gelandang tengah (CM) U-23 lokal di Liga 1 musim 25/26 yang unggul dalam progresi bola (accurate_long_balls) dan pertahanan PAdj, lalu tampilkan visual peer comparison-nya.",
   },
-};
+  {
+    category: "MULTI-SEASON & TOP LEAGUES",
+    label: "Bandingkan gaya main Arsenal di Premier League atau evolusi 2 musim Marc Klok",
+    prompt:
+      "Buatkan visual report evolusi dua musim (25/26 vs 26/27) untuk Marc Klok lengkap dengan perubahan persentil dan analisis perannya.",
+  },
+];
 
 function Home() {
   const fixtures = Route.useLoaderData();
-  const [activeMode, setActiveMode] = useState<WorkModeKey>("scouting");
-  const [input, setInput] = useState(WORK_MODES.scouting.samplePrompt);
+  const [input, setInput] = useState("");
   const navigate = useNavigate();
-
-  function selectMode(mode: WorkModeKey) {
-    setActiveMode(mode);
-    setInput(WORK_MODES[mode].samplePrompt);
-  }
 
   function startConversation(text: string) {
     const message = text.trim();
@@ -91,71 +78,51 @@ function Home() {
     startConversation(input);
   }
 
-  const currentMode = WORK_MODES[activeMode];
-
   return (
     <div className="flex-1 flex flex-col bg-[#0F172A] overflow-y-auto">
       {/* Top Editorial Sub-Header */}
       <div className="px-6 md:px-8 py-3 border-b border-[#334155] bg-[#0B1120] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="font-tech text-[11px] uppercase tracking-widest text-[#6EE7B7] font-semibold">
-            Indonesia Super League Intelligence Desk
+            Football Intelligence &amp; Visual Desk
           </span>
           <span className="text-[#334155]">|</span>
           <span className="font-tech text-[11px] text-[#94A3B8]">
-            8 Leagues • 14,184 Aggregated Player Profiles
+            Liga 1 + Top 5 European Leagues • 23 Seasons
           </span>
         </div>
-        <span className="font-tech text-[10px] text-[#64748B]">
-          NO-SQL CONVERSATIONAL WORKSPACE
-        </span>
+        <Link
+          to="/studio"
+          className="inline-flex items-center gap-1.5 font-tech text-[10px] text-[#38BDF8] hover:text-[#6EE7B7] transition-colors"
+        >
+          <SlidersHorizontal className="w-3 h-3" />
+          OPEN INTERACTIVE VISUAL STUDIO &rarr;
+        </Link>
       </div>
 
-      {/* Asymmetric Split Layout: Left Work Desk (7 cols) + Right Matchweek Slate (5 cols) */}
+      {/* Asymmetric Split Layout: Left Open Editorial Desk (7 cols) + Right Matchweek Slate & Studio Card (5 cols) */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12">
-        {/* Left Column: Masthead + Segmented Work Brief Composer */}
-        <div className="lg:col-span-7 p-6 md:p-8 lg:border-r border-[#334155] flex flex-col justify-between gap-6">
+        {/* Left Column: Open Conversational Brief + Subtle Inspiration Prompts */}
+        <div className="lg:col-span-7 p-6 md:p-8 lg:border-r border-[#334155] flex flex-col justify-between gap-8">
           <div className="space-y-6">
             {/* Editorial Masthead */}
             <div className="space-y-2.5">
               <div className="font-tech text-[10px] uppercase tracking-widest text-[#38BDF8]">
-                PostgreSQL Analytics + Hybrid News &amp; Regulation RAG
+                PostgreSQL Match Engine + Hybrid News &amp; Regulation RAG
               </div>
               <h1 className="font-editorial text-3xl md:text-4xl font-bold tracking-tight text-[#F8FAFC] leading-tight">
-                Analisis taktik, prediksi Starting XI, dan scouting berbasis data.
+                Tanyakan apa saja soal taktik tim, scouting pemain, atau persiapan laga.
               </h1>
               <p className="text-sm text-[#94A3B8] max-w-xl leading-relaxed">
-                Pilih mode kerja di bawah atau tulis pertanyaan dalam bahasa sehari-hari. Sistem otomatis menarik data match, berita cedera terbaru, dan merender kartu visual siap ekspor.
+                Ketik bebas dengan bahasa sehari-hari—mulai dari bedah gaya main klub, kekuatan &amp; kelemahan lawan, prediksi Starting XI, hingga pencarian pemain lintas 8 liga.
               </p>
             </div>
 
-            {/* Segmented Work Mode Composer */}
+            {/* Open Free-Form Conversational Composer (No Rigid Tabs) */}
             <form
               onSubmit={handleSubmit}
-              className="border border-[#334155] bg-[#1E293B]/40 rounded-lg overflow-hidden focus-within:border-[#6EE7B7] transition-colors"
+              className="border border-[#334155] bg-[#0B1120]/90 focus-within:border-[#6EE7B7] transition-colors"
             >
-              {/* Segmented Tabs */}
-              <div className="grid grid-cols-3 border-b border-[#334155] bg-[#0B1120] text-xs font-semibold">
-                {(Object.keys(WORK_MODES) as WorkModeKey[]).map((key) => {
-                  const isActive = activeMode === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => selectMode(key)}
-                      className={`px-3 py-2.5 text-center border-r last:border-r-0 border-[#334155] transition-colors cursor-pointer ${
-                        isActive
-                          ? "bg-[#0F172A] text-[#6EE7B7] border-b-2 border-b-[#6EE7B7]"
-                          : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1E293B]/50"
-                      }`}
-                    >
-                      {WORK_MODES[key].tabLabel}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Textarea */}
               <div className="p-4 space-y-3">
                 <textarea
                   value={input}
@@ -166,114 +133,183 @@ function Home() {
                       startConversation(input);
                     }
                   }}
-                  placeholder="Tulis brief scouting, prematch, atau nama pemain..."
+                  placeholder="Tulis pertanyaan bebas... misal: 'Gimana gaya main, kekuatan & kelemahan Borneo FC musim ini?', 'Bandingkan Mariano Peralta vs Ciro Alves', atau 'Siapa bek tengah U-23 lokal paling tangguh di Liga 1?'"
                   rows={4}
                   className="w-full bg-transparent text-sm text-[#F8FAFC] placeholder:text-[#64748B] focus:outline-none resize-none leading-relaxed"
                 />
 
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#334155]/80">
-                  <div className="font-tech text-[10px] text-[#94A3B8]">
-                    <span className="text-[#38BDF8] mr-1.5">[{currentMode.toolTag}]</span>
-                    {currentMode.guardrailNote}
+                  <div className="font-tech text-[10px] text-[#64748B]">
+                    AUTO-ROUTING: TEAM STYLE (24 METRICS) • SCOUTING • PRE-MATCH XI • SQL + RAG
                   </div>
                   <button
                     type="submit"
                     disabled={!input.trim()}
-                    className="inline-flex items-center gap-2 rounded bg-[#6EE7B7] hover:bg-[#34D399] disabled:opacity-40 text-[#0F172A] px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-2 bg-[#6EE7B7] hover:bg-[#34D399] disabled:opacity-40 text-[#0F172A] px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    Jalankan Analisis
+                    Mulai Analisis
                   </button>
                 </div>
               </div>
             </form>
+
+            {/* Subtle Inspiration Prompts (Not Rigid Feature Tabs) */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-tech text-[10px] uppercase tracking-widest text-[#64748B]">
+                  Inspirasi Pertanyaan — Klik untuk isi atau langsung jalankan
+                </span>
+              </div>
+
+              <div className="divide-y divide-[#334155]/70 border-y border-[#334155]/70">
+                {INSPIRATION_PROMPTS.map((item) => (
+                  <div
+                    key={item.category}
+                    className="py-2.5 flex items-center justify-between gap-3 group hover:bg-[#1E293B]/35 px-2 -mx-2 transition-colors"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setInput(item.prompt)}
+                      className="text-left min-w-0 flex-1 cursor-pointer"
+                    >
+                      <div className="font-tech text-[9px] uppercase tracking-wider text-[#38BDF8]">
+                        {item.category}
+                      </div>
+                      <div className="text-xs text-[#CBD5E1] group-hover:text-[#F8FAFC] truncate mt-0.5">
+                        {item.label}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startConversation(item.prompt)}
+                      title="Langsung jalankan analisis ini"
+                      className="inline-flex items-center gap-1 font-tech text-[10px] text-[#64748B] hover:text-[#6EE7B7] border border-transparent hover:border-[#334155] px-2 py-1 shrink-0 cursor-pointer transition-colors"
+                    >
+                      Tanya
+                      <ArrowUpRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Methodology & Palette Legend Strip */}
+          {/* Methodology Footnote Strip */}
           <div className="pt-4 border-t border-[#334155] grid grid-cols-3 gap-4 text-[11px]">
             <div>
-              <div className="font-tech text-[10px] text-[#6EE7B7] uppercase">Progression Proxy</div>
+              <div className="font-tech text-[10px] text-[#6EE7B7] uppercase">24-Metric Team DNA</div>
               <div className="text-[#CBD5E1] mt-0.5">
-                <code className="font-tech text-[10px]">accurate_long_balls</code> &amp;{" "}
-                <code className="font-tech text-[10px]">acc_opp_half_passes</code>
+                In/Out of Possession Style, Attack/Defence &amp; Key Players
               </div>
             </div>
             <div>
-              <div className="font-tech text-[10px] text-[#38BDF8] uppercase">Calibrated Defense</div>
+              <div className="font-tech text-[10px] text-[#38BDF8] uppercase">Calibrated Player Stats</div>
               <div className="text-[#CBD5E1] mt-0.5">
-                PAdj per 500 opponent touches (<code className="font-tech text-[10px]">padj500</code>)
+                True Position (&ge;35% share) &amp; PAdj per 500 opp. touches
               </div>
             </div>
             <div>
-              <div className="font-tech text-[10px] text-[#FF6350] uppercase">Lineup Integrity</div>
+              <div className="font-tech text-[10px] text-[#FF6350] uppercase">Verified Context</div>
               <div className="text-[#CBD5E1] mt-0.5">
-                Cek cedera, 50/50 doubtful, &amp; kuota U-23 / Asing
+                RAG berita cedera, 50/50 doubtful, &amp; kuota regulasi Liga 1
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Matchweek Slate (1px Scoreboard Rail) */}
-        <div className="lg:col-span-5 p-6 md:p-8 bg-[#0B1120]/70 space-y-5">
-          <div className="flex items-center justify-between border-b border-[#334155] pb-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[#6EE7B7]" />
-              <span className="font-tech text-xs uppercase tracking-wider font-bold text-[#F8FAFC]">
-                Matchweek Slate · Liga 1
+        {/* Right Column: Visual Studio Lab Launchpad + Matchweek Slate */}
+        <div className="lg:col-span-5 p-6 md:p-8 bg-[#0B1120]/70 space-y-6">
+          {/* Interactive Visual Studio Callout */}
+          <div className="border border-[#38BDF8]/40 bg-[#0F172A] p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-tech text-[10px] uppercase tracking-widest text-[#38BDF8] font-bold">
+                No-Code Visual Template Builder
+              </span>
+              <span className="font-tech text-[9px] px-1.5 py-0.5 bg-[#38BDF8]/15 text-[#38BDF8]">
+                TEAM &amp; PLAYER LEVEL
               </span>
             </div>
-            <span className="font-tech text-[10px] text-[#6EE7B7] border border-[#334155] px-2 py-0.5 rounded">
-              1-CLICK PRE-MATCH
-            </span>
-          </div>
-
-          <div className="divide-y divide-[#334155]">
-            {fixtures.slice(0, 6).map((f) => (
-              <button
-                key={`${f.matchId}-${f.homeTeam}`}
-                type="button"
-                onClick={() =>
-                  startConversation(
-                    `Analisis prematch ${f.homeTeam} vs ${f.awayTeam} dan prediksi Starting XI kedua tim berdasarkan performa terakhir, berita cedera/akumulasi kartu di RAG, serta aturan kuota U-23.`,
-                  )
-                }
-                className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-[#1E293B]/50 px-2 -mx-2 rounded transition-colors cursor-pointer group"
+            <h2 className="font-editorial text-lg font-bold text-[#F8FAFC]">
+              Racik kartu visual &amp; scatter plot sendiri di Visual Studio Lab.
+            </h2>
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
+              Pilih liga, musim, level tim/pemain, dan kustomisasi metrik sesuka hati (24 metrik Team Style, X/Y Scatter, Percentile Card, hingga Custom Leaderboard) siap ekspor PNG.
+            </p>
+            <div className="pt-1">
+              <Link
+                to="/studio"
+                className="inline-flex items-center gap-2 border border-[#38BDF8] bg-[#38BDF8]/10 hover:bg-[#38BDF8] text-[#38BDF8] hover:text-[#0F172A] px-3.5 py-1.5 font-tech text-[11px] font-bold transition-colors"
               >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[#F8FAFC] group-hover:text-[#6EE7B7] transition-colors truncate">
-                    {f.homeTeam} <span className="text-[#64748B] font-normal">vs</span> {f.awayTeam}
-                  </div>
-                  <div className="font-tech text-[10px] text-[#94A3B8] mt-1 flex items-center gap-2">
-                    <span>PEKAN {f.round}</span>
-                    <span>•</span>
-                    <span className="text-[#38BDF8]">{f.scoreLabel}</span>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1 font-tech text-[11px] px-2.5 py-1 border border-[#334155] group-hover:border-[#6EE7B7] text-[#CBD5E1] group-hover:text-[#6EE7B7] rounded shrink-0 transition-colors">
-                  Prediksi XI
-                  <ArrowRight className="w-3 h-3" />
-                </span>
-              </button>
-            ))}
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Buka Visual Studio Lab
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
 
-          {/* Quick Player Spotlight Links */}
-          <div className="pt-4 border-t border-[#334155] space-y-2.5">
-            <div className="font-tech text-[10px] uppercase tracking-widest text-[#64748B]">
-              Quick Player Dossiers (Top Leagues &amp; Liga 1)
+          {/* Matchweek Slate */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-[#334155] pb-2.5">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#6EE7B7]" />
+                <span className="font-tech text-xs uppercase tracking-wider font-bold text-[#F8FAFC]">
+                  Matchweek Slate · Liga 1
+                </span>
+              </div>
+              <span className="font-tech text-[10px] text-[#6EE7B7] border border-[#334155] px-2 py-0.5">
+                UPCOMING FIRST
+              </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+
+            <div className="divide-y divide-[#334155]">
+              {fixtures.slice(0, 6).map((f) => (
+                <button
+                  key={`${f.matchId}-${f.homeTeam}`}
+                  type="button"
+                  onClick={() =>
+                    startConversation(
+                      `Analisis prematch ${f.homeTeam} vs ${f.awayTeam} dan prediksi Starting XI kedua tim berdasarkan gaya main, performa terakhir, berita cedera/akumulasi kartu di RAG, serta aturan kuota U-23.`,
+                    )
+                  }
+                  className="w-full py-3 flex items-center justify-between gap-3 text-left hover:bg-[#1E293B]/50 px-2 -mx-2 transition-colors cursor-pointer group"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-[#F8FAFC] group-hover:text-[#6EE7B7] transition-colors truncate">
+                      {f.homeTeam} <span className="text-[#64748B] font-normal">vs</span> {f.awayTeam}
+                    </div>
+                    <div className="font-tech text-[10px] text-[#94A3B8] mt-0.5 flex items-center gap-2">
+                      <span>PEKAN {f.round}</span>
+                      <span>•</span>
+                      <span className="text-[#38BDF8]">{f.scoreLabel}</span>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 font-tech text-[10px] px-2 py-1 border border-[#334155] group-hover:border-[#6EE7B7] text-[#CBD5E1] group-hover:text-[#6EE7B7] shrink-0 transition-colors">
+                    Brief XI
+                    <ArrowRight className="w-3 h-3" />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Multi-League Dossiers */}
+          <div className="pt-3 border-t border-[#334155] space-y-2">
+            <div className="font-tech text-[10px] uppercase tracking-widest text-[#64748B]">
+              Contoh Cepat (Klub &amp; Pemain Lintas Liga)
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {[
+                { label: "Persib Style & Key Players", q: "Bedah playing style, strengths, weaknesses, dan key players Persib Bandung musim ini." },
                 { label: "Mariano Peralta (Liga 1)", q: "Buatkan visual report scouting untuk Mariano Peralta di Liga 1." },
-                { label: "Marc Klok (2-Season)", q: "Buatkan visual report evolusi dua musim (25/26 vs 26/27) untuk Marc Klok." },
-                { label: "Rizky Ridho (PAdj)", q: "Tampilkan visual report scouting dan metrik bertahan PAdj untuk Rizky Ridho." },
-                { label: "Bukayo Saka (EPL)", q: "Buatkan visual report scouting untuk Bukayo Saka di Premier League." },
+                { label: "Arsenal Style (EPL)", q: "Bedah playing style, strengths & weaknesses, dan key players Arsenal di Premier League." },
+                { label: "Barcelona Style (LaLiga)", q: "Bedah playing style, strengths & weaknesses, dan key players Barcelona di LaLiga." },
               ].map((item) => (
                 <button
                   key={item.label}
                   type="button"
                   onClick={() => startConversation(item.q)}
-                  className="font-tech text-[11px] px-2.5 py-1 border border-[#334155] bg-[#0F172A] hover:border-[#38BDF8] text-[#CBD5E1] hover:text-[#38BDF8] rounded transition-colors cursor-pointer"
+                  className="font-tech text-[10px] px-2.5 py-1 border border-[#334155] bg-[#0F172A] hover:border-[#6EE7B7] text-[#CBD5E1] hover:text-[#6EE7B7] transition-colors cursor-pointer"
                 >
                   {item.label}
                 </button>

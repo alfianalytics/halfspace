@@ -1,6 +1,7 @@
 import {
   getPlayerReportData,
   getPrematchContext,
+  getTeamStyleProfile,
   queryReadOnly,
   scoutLiga1Players,
 } from "@halfspace/db";
@@ -90,7 +91,28 @@ export function createLiga1McpServer() {
     },
   );
 
-  // 4. query_liga1_readonly_sql (Guarded Fallback)
+  // 4. get_team_style_profile
+  server.registerTool(
+    "get_team_style_profile",
+    {
+      title: "Get Club Playing Style, Strengths/Weaknesses & Key Players Profile",
+      description:
+        "Compute a club's 24-metric Tactical Playing Style (In Possession & Out of Possession) and Performance Efficiency (Attack & Defence) across Overall, Home, Away, and Last 6 Matches, plus auto-extracted Strengths, Weaknesses, Dominant Formations, Top Threats, and Top Creators.",
+      inputSchema: z.object({
+        teamName: z.string().describe("Club name, e.g. Persib Bandung, Borneo FC, Persija Jakarta, Arsenal, Barcelona"),
+        league: z.string().optional().describe("League name: 'Liga 1' (default), 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
+        season: z.string().optional().describe("Season: 26/27 (default), 25/26, or 24/25"),
+      }),
+    },
+    async (args) => {
+      const result = await getTeamStyleProfile(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  // 5. query_liga1_readonly_sql (Guarded Fallback)
   server.registerTool(
     "query_liga1_readonly_sql",
     {

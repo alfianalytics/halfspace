@@ -70,15 +70,25 @@ export type RawAggregatedPlayer = {
   minutesPlayed: number;
   goals: number;
   assists: number;
+  goalsPer90: number;
+  assistsPer90: number;
   nonPenXg: number;
   openPlayXg: number;
   setPieceXg: number;
   shotsPer90: number;
   nonPenXgPer90: number;
+  xgotPer90: number;
+  expectedAssistsPer90: number;
   keyPassesPer90: number;
+  bigChancesCreatedPer90: number;
+  accurateCrossesPer90: number;
   accurateLongBallsPer90: number;
   accurateOppositionHalfPassesPer90: number;
   accuratePassesPer90: number;
+  passAccuracyPct: number;
+  touchesPer90: number;
+  successfulDribblesPer90: number;
+  foulsWonPer90: number;
   att3rdTouchesPer90: number;
   tacklesPer90: number;
   interceptionsPer90: number;
@@ -122,10 +132,10 @@ export async function fetchSeasonPlayerCohort(
   const promise = (async () => {
     await ensureHalfspaceSchema();
 
-    // 1. Check pre-aggregated table `halfspace.agg_player_season_all` first (<30ms)
+    // 1. Check pre-aggregated table `halfspace.agg_player_season_v2` first (<30ms)
     try {
       const aggRes = await getPgPool().query(
-        `SELECT payload FROM halfspace.agg_player_season_all WHERE tournament_id = $1 AND season_id = $2`,
+        `SELECT payload FROM halfspace.agg_player_season_v2 WHERE tournament_id = $1 AND season_id = $2`,
         [tournamentId, seasonId],
       );
       if (aggRes.rows.length > 20) {
@@ -164,6 +174,10 @@ export async function fetchSeasonPlayerCohort(
         SUM(COALESCE(s.goals, 0)) AS goals,
         SUM(COALESCE(s.goal_assist, 0)) AS assists,
         SUM(COALESCE(s.non_pen_xg, s.xg, s.expected_goals, 0)) AS non_pen_xg,
+        SUM(COALESCE(s.xgot, s.expected_goals_on_target, 0)) AS xgot,
+        SUM(COALESCE(s.expected_assists, 0)) AS expected_assists,
+        SUM(COALESCE(s.big_chance_created, 0)) AS big_chances_created,
+        SUM(COALESCE(s.accurate_cross, 0)) AS accurate_crosses,
         SUM(COALESCE(s.open_play_xg, 0)) AS open_play_xg,
         SUM(COALESCE(s.set_piece_xg, 0)) AS set_piece_xg,
         SUM(COALESCE(s.total_shots, 0)) AS total_shots,
@@ -171,7 +185,10 @@ export async function fetchSeasonPlayerCohort(
         SUM(COALESCE(s.accurate_long_balls, 0)) AS accurate_long_balls,
         SUM(COALESCE(s.accurate_opposition_half_passes, 0)) AS acc_opp_half_passes,
         SUM(COALESCE(s.accurate_pass, 0)) AS accurate_passes,
+        SUM(COALESCE(s.total_pass, 0)) AS total_passes,
         SUM(COALESCE(s.touches, 0)) AS touches,
+        SUM(COALESCE(s.won_contest, 0)) AS successful_dribbles,
+        SUM(COALESCE(s.was_fouled, 0)) AS fouls_won,
         SUM(COALESCE(s.total_tackle, 0)) AS tackles,
         SUM(COALESCE(s.interception_won, 0)) AS interceptions,
         SUM(COALESCE(s.ball_recovery, 0)) AS recoveries,
@@ -239,15 +256,28 @@ export async function fetchSeasonPlayerCohort(
       minutesPlayed: mins,
       goals: Number(r.goals ?? 0),
       assists: Number(r.assists ?? 0),
+      goalsPer90: num(Number(r.goals ?? 0) / nineties),
+      assistsPer90: num(Number(r.assists ?? 0) / nineties),
       nonPenXg: num(r.non_pen_xg),
       openPlayXg: num(r.open_play_xg),
       setPieceXg: num(r.set_piece_xg),
       shotsPer90: num(Number(r.total_shots ?? 0) / nineties),
       nonPenXgPer90: num(Number(r.non_pen_xg ?? 0) / nineties),
+      xgotPer90: num(Number(r.xgot ?? 0) / nineties),
+      expectedAssistsPer90: num(Number(r.expected_assists ?? 0) / nineties),
       keyPassesPer90: num(Number(r.key_passes ?? 0) / nineties),
+      bigChancesCreatedPer90: num(Number(r.big_chances_created ?? 0) / nineties),
+      accurateCrossesPer90: num(Number(r.accurate_crosses ?? 0) / nineties),
       accurateLongBallsPer90: num(Number(r.accurate_long_balls ?? 0) / nineties),
       accurateOppositionHalfPassesPer90: num(Number(r.acc_opp_half_passes ?? 0) / nineties),
       accuratePassesPer90: num(Number(r.accurate_passes ?? 0) / nineties),
+      passAccuracyPct:
+        Number(r.total_passes ?? 0) > 0
+          ? num((Number(r.accurate_passes ?? 0) / Number(r.total_passes)) * 100, 1)
+          : 0,
+      touchesPer90: num(Number(r.touches ?? 0) / nineties),
+      successfulDribblesPer90: num(Number(r.successful_dribbles ?? 0) / nineties),
+      foulsWonPer90: num(Number(r.fouls_won ?? 0) / nineties),
       att3rdTouchesPer90: num((Number(r.acc_opp_half_passes ?? 0) * 1.35) / nineties),
       tacklesPer90: num(tackles / nineties),
       interceptionsPer90: num(interceptions / nineties),
@@ -279,7 +309,7 @@ export async function fetchSeasonPlayerCohort(
           }
           if (placeholders.length > 0) {
             await client.query(
-              `INSERT INTO halfspace.agg_player_season_all (tournament_id, tournament_name, season_id, season_key, player_id, payload, updated_at)
+              `INSERT INTO halfspace.agg_player_season_v2 (tournament_id, tournament_name, season_id, season_key, player_id, payload, updated_at)
                VALUES ${placeholders.join(", ")}
                ON CONFLICT (tournament_id, season_id, player_id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
               values,
@@ -1035,6 +1065,47 @@ export async function getPrematchContext(input: {
  * Fetch featured Liga 1 fixtures / big matches for the Home screen bar (`/`)
  */
 export async function getFeaturedLiga1Fixtures(limit = 6) {
+  // 1. Primary source: `sofascore.fact_upcoming_match` (live upcoming matchweek schedule)
+  try {
+    const upcomingRows = await queryReadOnly(
+      `
+      SELECT
+        match_id,
+        (match_datetime AT TIME ZONE 'UTC') AS utc_dt,
+        round,
+        home_team_name AS home_team,
+        away_team_name AS away_team
+      FROM sofascore.fact_upcoming_match
+      WHERE tournament_id = $1
+        AND COALESCE(status_type, 'notstarted') = 'notstarted'
+        AND match_datetime >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '6 hours'
+      ORDER BY match_datetime ASC
+      LIMIT $2;
+      `,
+      [LIGA1_TOURNAMENT_ID, limit],
+    );
+
+    if (upcomingRows.length > 0) {
+      return upcomingRows.map((r) => {
+        const dt = r.utc_dt ? new Date(r.utc_dt) : null;
+        const scoreLabel =
+          dt && Number.isFinite(dt.getTime())
+            ? `${dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", timeZone: "Asia/Jakarta" })} • ${dt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).replace(".", ":")} WIB`
+            : "UPCOMING";
+        return {
+          matchId: Number(r.match_id),
+          homeTeam: String(r.home_team),
+          awayTeam: String(r.away_team),
+          round: Number(r.round ?? 1),
+          scoreLabel,
+        };
+      });
+    }
+  } catch {
+    // Fallback to fact_match below if fact_upcoming_match unavailable
+  }
+
+  // 2. Secondary fallback: recent completed matches in `sofascore.fact_match`
   try {
     const rows = await queryReadOnly(
       `
@@ -1051,6 +1122,7 @@ export async function getFeaturedLiga1Fixtures(limit = 6) {
       JOIN sofascore.dim_team at ON at.team_id = m.away_team_id
       WHERE m.tournament_id = $1
         AND m.season_id IN (100394, 78590)
+        AND m.home_score IS NOT NULL
       ORDER BY m.match_datetime DESC
       LIMIT $2;
       `,
@@ -1063,8 +1135,7 @@ export async function getFeaturedLiga1Fixtures(limit = 6) {
         homeTeam: String(r.home_team),
         awayTeam: String(r.away_team),
         round: Number(r.round ?? 1),
-        scoreLabel:
-          r.home_score !== null && r.away_score !== null ? `${r.home_score} - ${r.away_score}` : "Upcoming",
+        scoreLabel: `${r.home_score} - ${r.away_score}`,
       }));
     }
   } catch {
@@ -1072,9 +1143,9 @@ export async function getFeaturedLiga1Fixtures(limit = 6) {
   }
 
   return [
-    { matchId: 1, homeTeam: "Persib Bandung", awayTeam: "Persija Jakarta", round: 12, scoreLabel: "Big Match" },
-    { matchId: 2, homeTeam: "Persebaya Surabaya", awayTeam: "Borneo FC", round: 12, scoreLabel: "Big Match" },
-    { matchId: 3, homeTeam: "Bali United", awayTeam: "PSM Makassar", round: 12, scoreLabel: "Big Match" },
-    { matchId: 4, homeTeam: "Dewa United", awayTeam: "Persis Solo", round: 12, scoreLabel: "Matchweek" },
+    { matchId: 1, homeTeam: "Persib Bandung", awayTeam: "Persija Jakarta", round: 12, scoreLabel: "Upcoming" },
+    { matchId: 2, homeTeam: "Persebaya Surabaya", awayTeam: "Borneo FC", round: 12, scoreLabel: "Upcoming" },
+    { matchId: 3, homeTeam: "Bali United", awayTeam: "PSM Makassar", round: 12, scoreLabel: "Upcoming" },
+    { matchId: 4, homeTeam: "Dewa United", awayTeam: "Persis Solo", round: 12, scoreLabel: "Upcoming" },
   ];
 }

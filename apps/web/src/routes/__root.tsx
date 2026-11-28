@@ -10,6 +10,8 @@ import {
   MessageSquare,
   Plus,
   RefreshCw,
+  SlidersHorizontal,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import "../styles.css";
@@ -94,8 +96,48 @@ function RootLayout() {
             </span>
           </Link>
           <span className="font-tech text-[10px] text-[#6EE7B7] border border-[#334155] px-1.5 py-0.5 rounded">
-            LIGA 1
+            8 LEAGUES
           </span>
+        </div>
+
+        {/* Primary Workspace Navigation */}
+        <div className="p-3 space-y-1 border-b border-[#334155]">
+          <Link
+            to="/"
+            activeOptions={{ exact: true }}
+            activeProps={{
+              className: "bg-[#1E293B] text-[#6EE7B7] border-[#6EE7B7]/50",
+            }}
+            inactiveProps={{
+              className: "text-[#CBD5E1] hover:text-[#F8FAFC] hover:bg-[#1E293B]/40 border-transparent",
+            }}
+            className="w-full flex items-center justify-between px-3 py-2 rounded border text-xs font-semibold transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-[#6EE7B7]" />
+              Intelligence Chat
+            </span>
+            <span className="font-tech text-[9px] text-[#64748B]">AI + MCP</span>
+          </Link>
+
+          <Link
+            to="/studio"
+            activeProps={{
+              className: "bg-[#1E293B] text-[#38BDF8] border-[#38BDF8]/50",
+            }}
+            inactiveProps={{
+              className: "text-[#CBD5E1] hover:text-[#F8FAFC] hover:bg-[#1E293B]/40 border-transparent",
+            }}
+            className="w-full flex items-center justify-between px-3 py-2 rounded border text-xs font-semibold transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#38BDF8]" />
+              Visual Studio Lab
+            </span>
+            <span className="font-tech text-[9px] px-1 border border-[#38BDF8]/40 text-[#38BDF8]">
+              TEMPLATES
+            </span>
+          </Link>
         </div>
 
         {/* Actions */}
@@ -105,7 +147,7 @@ function RootLayout() {
             className="w-full flex items-center justify-center gap-2 rounded bg-[#6EE7B7] hover:bg-[#34D399] text-[#0F172A] px-3 py-2 text-xs font-bold transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Analisis / Brief Baru
+            Brief Percakapan Baru
           </Link>
 
           <button
@@ -139,7 +181,7 @@ function RootLayout() {
         <nav className="flex-1 overflow-y-auto divide-y divide-[#334155]/40">
           {sessions.length === 0 ? (
             <div className="px-4 py-8 text-xs text-[#64748B] leading-relaxed">
-              Belum ada arsip. Pilih pertandingan di Matchweek Slate atau tulis brief baru.
+              Belum ada arsip. Tulis pertanyaan bebas di layar utama atau buat grafik di Visual Studio.
             </div>
           ) : (
             sessions.map((session) => (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { UIToolMessagePart } from "@anvia/client";
 import {
   AlertCircle,
+  BarChart3,
   BookOpen,
   CheckCircle2,
   ChevronDown,
@@ -15,14 +16,18 @@ import {
 } from "lucide-react";
 import {
   PeerComparisonCard,
+  PlayerRankingCard,
   PlayerScoutingCard,
   PrematchLineupCard,
+  TeamScatterCard,
+  TeamStyleProfileCard,
 } from "./reports/visual-cards";
 
 function getToolIcon(toolName: string) {
   if (toolName === "scout_players") return <Users className="w-3.5 h-3.5 text-[#6EE7B7]" />;
   if (toolName === "get_prematch_context") return <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />;
   if (toolName === "get_player_report_data") return <Database className="w-3.5 h-3.5 text-[#6EE7B7]" />;
+  if (toolName === "get_team_style_profile") return <BarChart3 className="w-3.5 h-3.5 text-[#6EE7B7]" />;
   if (toolName === "search_liga1_knowledge_rag") return <BookOpen className="w-3.5 h-3.5 text-[#38BDF8]" />;
   if (toolName === "query_liga1_readonly_sql") return <Database className="w-3.5 h-3.5 text-[#94A3B8]" />;
   if (toolName === "search_live_football_web") return <Globe className="w-3.5 h-3.5 text-[#38BDF8]" />;
@@ -33,6 +38,8 @@ function getToolLabel(toolName: string) {
   if (toolName === "scout_players") return "PostgreSQL MCP · Player Scouting & Peer Quadrant";
   if (toolName === "get_prematch_context") return "PostgreSQL + RAG MCP · Pre-Match & Predicted XI";
   if (toolName === "get_player_report_data") return "PostgreSQL MCP · Player Scouting & 2-Season Evolution";
+  if (toolName === "get_team_style_profile")
+    return "PostgreSQL MCP · Team Style, Strengths/Weaknesses & Key Players";
   if (toolName === "search_liga1_knowledge_rag") return "Hybrid RAG · News, Injuries & Regulations";
   if (toolName === "query_liga1_readonly_sql") return "PostgreSQL MCP · Read-Only SQL Query";
   if (toolName === "search_live_football_web") return "Web Search MCP · Live Matchday News";
@@ -132,6 +139,9 @@ export function ToolCall({ part }: { part: UIToolMessagePart }) {
       {visualCard?.cardType === "player_scouting" && <PlayerScoutingCard card={visualCard} />}
       {visualCard?.cardType === "prematch_lineup" && <PrematchLineupCard card={visualCard} />}
       {visualCard?.cardType === "peer_comparison" && <PeerComparisonCard card={visualCard} />}
+      {visualCard?.cardType === "team_style_profile" && <TeamStyleProfileCard card={visualCard} />}
+      {visualCard?.cardType === "player_ranking" && <PlayerRankingCard card={visualCard} />}
+      {visualCard?.cardType === "team_scatter" && <TeamScatterCard card={visualCard} />}
     </div>
   );
 }

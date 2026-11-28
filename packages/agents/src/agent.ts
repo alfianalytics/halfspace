@@ -112,11 +112,13 @@ export function runHalfspaceAgent(options: RunHalfspaceAgentOptions): AgentStrea
     mcpToolsCalled:
       preflight.detectedMode === "prematch"
         ? ["get_prematch_context", "search_liga1_knowledge_rag"]
-        : preflight.detectedMode === "visual_report"
-          ? ["get_player_report_data"]
-          : preflight.detectedMode === "scouting"
-            ? ["scout_players", "search_liga1_knowledge_rag"]
-            : ["search_liga1_knowledge_rag"],
+        : preflight.detectedMode === "team_style"
+          ? ["get_team_style_profile"]
+          : preflight.detectedMode === "visual_report"
+            ? ["get_player_report_data"]
+            : preflight.detectedMode === "scouting"
+              ? ["scout_players", "search_liga1_knowledge_rag"]
+              : ["search_liga1_knowledge_rag"],
     ragDocsCited:
       preflight.detectedMode === "prematch"
         ? ["reg-liga1-u23-2627", "reg-liga1-foreign-quota-2627", "news-persib-prematch-nov26"]

@@ -133,7 +133,7 @@ export async function ensureHalfspaceSchema(): Promise<void> {
             );
           `);
           await client.query(`
-            CREATE TABLE IF NOT EXISTS halfspace.agg_player_season_all (
+            CREATE TABLE IF NOT EXISTS halfspace.agg_player_season_v2 (
               tournament_id INT NOT NULL,
               tournament_name TEXT NOT NULL,
               season_id INT NOT NULL,
@@ -142,6 +142,17 @@ export async function ensureHalfspaceSchema(): Promise<void> {
               payload JSONB NOT NULL,
               updated_at TIMESTAMP DEFAULT NOW(),
               PRIMARY KEY (tournament_id, season_id, player_id)
+            );
+          `);
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS halfspace.agg_team_style_all (
+              tournament_id INT NOT NULL,
+              season_id INT NOT NULL,
+              team_id INT NOT NULL,
+              situation TEXT NOT NULL,
+              payload JSONB NOT NULL,
+              updated_at TIMESTAMP DEFAULT NOW(),
+              PRIMARY KEY (tournament_id, season_id, team_id, situation)
             );
           `);
           await client.query(`

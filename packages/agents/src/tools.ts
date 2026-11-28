@@ -2,6 +2,7 @@ import { createTool } from "@anvia/core";
 import {
   getPlayerReportData,
   getPrematchContext,
+  getTeamStyleProfile,
   loadUserMemoryFacts,
   queryReadOnly,
   saveUserMemoryFact,
@@ -136,14 +137,14 @@ export const getPlayerReportDataTool = createTool({
 export const queryLiga1ReadonlySqlTool = createTool({
   name: "query_liga1_readonly_sql",
   description:
-    "Guarded read-only SELECT query tool against the PostgreSQL `sofascore` schema for unique ad-hoc follow-up questions (e.g. top scorers, specific match scores, goalkeeper saves). Restricted to SELECT-only with 3000ms timeout and LIMIT 50. Tables: sofascore.dim_player, sofascore.dim_team, sofascore.fact_match, sofascore.fact_player_x_match_stats, sofascore.fact_team_x_match_stats, sofascore.fact_shots, sofascore.fact_incidents. Liga 1 tournament_id = 1015; season_id: 65049 (24/25), 78590 (25/26), 100394 (26/27).",
+    "Guarded read-only SELECT query tool against the PostgreSQL `sofascore` schema for unique ad-hoc follow-up questions (e.g. upcoming schedules in `sofascore.fact_upcoming_match`, top scorers, specific match scores, goalkeeper saves). Restricted to SELECT-only with 8000ms timeout and LIMIT 50. Tables: sofascore.fact_upcoming_match (tournament_id, season_id, match_id, match_datetime [UTC], home_team_name, away_team_name, round, status_type), sofascore.dim_player, sofascore.dim_team, sofascore.fact_match, sofascore.fact_player_x_match_stats, sofascore.fact_team_x_match_stats, sofascore.fact_shots, sofascore.fact_incidents. Tournament IDs: 1015 (Liga 1), 17 (Premier League), 8 (LaLiga), 23 (Serie A), 35 (Bundesliga), 34 (Ligue 1), 7 (UCL).",
   inputSchema: z.object({
     sqlQuery: z.string().describe("Read-only SELECT query against sofascore.*"),
   }),
   execute: async ({ sqlQuery }) => {
     const cleaned = sqlQuery.trim().replace(/;+$/, "");
     const withLimit = /\bLIMIT\s+\d+/i.test(cleaned) ? cleaned : `${cleaned} LIMIT 50`;
-    const rows = await queryReadOnly(withLimit, [], 3000);
+    const rows = await queryReadOnly(withLimit, [], 8000);
     return {
       rowCount: rows.length,
       rows,
@@ -203,10 +204,39 @@ export const rememberUserFactTool = createTool({
   },
 });
 
+/**
+ * 4b. Team Tactical Style, Strengths/Weaknesses & Key Players Tool (`balbalanalytics` 24-Metric Matrix)
+ */
+export const getTeamStyleProfileTool = createTool({
+  name: "get_team_style_profile",
+  description:
+    "Analyze a club's complete Playing Style (12 In-Possession & Out-of-Possession style metrics), Performance Strengths & Weaknesses (12 Attack & Defence efficiency metrics across Overall, Home, Away, and Last 6 Matches), Dominant Formations, and Key Players (Top Threats by npxG+Shots & Top Creators by Key Passes+xA). Works across Liga 1 and Top European Leagues. Returns a validated `visualCard` (`team_style_profile`).",
+  inputSchema: z.object({
+    teamName: z.string().describe("Club name, e.g. Persib Bandung, Borneo FC, Persija Jakarta, Persebaya, Arsenal, Barcelona"),
+    league: z
+      .string()
+      .optional()
+      .describe("League name: 'Liga 1' (default), 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
+    season: z.string().optional().describe("Season: 26/27 (default), 25/26, or 24/25"),
+  }),
+  execute: async (args) => {
+    const result = await getTeamStyleProfile(args);
+    if (!result.found || !result.card) {
+      return result;
+    }
+    const validatedCard = validateVisualCardPayload("team_style_profile", result.card);
+    return {
+      found: true,
+      visualCard: validatedCard,
+    };
+  },
+});
+
 export const HALFSPACE_TOOLS = [
   scoutPlayersTool,
   getPrematchContextTool,
   getPlayerReportDataTool,
+  getTeamStyleProfileTool,
   searchLiga1KnowledgeRagTool,
   queryLiga1ReadonlySqlTool,
   searchLiveWebNewsTool,

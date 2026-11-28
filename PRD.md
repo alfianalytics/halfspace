@@ -18,17 +18,21 @@
 
 ## 02 · Trigger → Output — *What starts a run, what comes out?*
 
-- **Trigger (Chat-First + 1-Click Matchweek Bar for Non-Technical Users)**:
-  - On the Home screen (`/`), the user can click any fixture from the live **"Jadwal & Big Match Liga 1"** bar, pick one of the **3 Quick-Start Use Case Cards**, or chat in natural language (Bahasa Indonesia / English):
-    1. **Player Scouting**: *"Carikan gelandang U-23 lokal di Liga 1 musim ini yang bagus dalam progresi bola dan bertahan."*
-    2. **Pre-Match Analysis & Lineup Prediction**: *"Analisis prematch Persib vs Persija minggu ini dan prediksi starting XI-nya berdasarkan performa terakhir dan berita cedera/akumulasi kartu."*
-    3. **Visual Report Generation**: *"Buatkan report evolusi dua musim (25/26 vs 26/27) untuk pemain ini lengkap dengan visual card-nya."*
-- **Output (Conversational Analysis + Inline Visual Cards with Dual PNG Export)**:
+- **Trigger (Open Conversational Desk + Interactive Visual Studio Lab + 1-Click Matchweek Bar)**:
+  - On the Home screen (`/`), the user has an **open, free-form conversational composer** (no rigid feature tabs) with subtle clickable inspiration prompts and a live **"Matchweek Slate"** bar (prioritizing upcoming fixtures), OR can open **Visual Studio Lab (`/studio`)** to interactively build Team-Level and Player-Level visuals across 8 leagues and 23 seasons:
+    1. **Team Style, Strengths/Weaknesses & Key Players**: *"Bedah playing style, kekuatan/kelemahan, formasi dominan, dan key players Persib Bandung musim ini."*
+    2. **Player Scouting & Peer Quadrant**: *"Carikan gelandang U-23 lokal di Liga 1 musim ini yang bagus dalam progresi bola dan bertahan."*
+    3. **Pre-Match Analysis & Lineup Prediction**: *"Analisis prematch Persib vs Persija dan prediksi starting XI-nya berdasarkan performa terakhir dan berita cedera/akumulasi kartu."*
+    4. **Visual Report & 2-Season Evolution**: *"Buatkan report evolusi dua musim (25/26 vs 26/27) untuk Marc Klok lengkap dengan visual card-nya."*
+- **Output (Conversational Analysis + 6 Editorial Visual Templates with Dual PNG Export)**:
   1. **Grounded Narrative & Lineup Breakdown**: Clear, jargon-free tactical explanation combining match statistics with cited news updates (`[doc_id]`) and Liga 1 regulations.
-  2. **3 Inline Visual Report Templates (`@anvia/react-ui` Custom Tool Parts)** with **1-Click Export PNG (`Editorial Dark #090A0F` or `Transparent / Clean Mode`)**:
-     - **`PlayerScoutingCard`**: Percentile bars (`0–100`), per-90 & possession-adjusted (`PAdj`) metrics, two-season evolution deltas (`25/26` → `26/27`), and `Early Season Sample` badges when active-season minutes are `180–449`.
-     - **`PrematchLineupCard`**: Side-by-side pitch formation diagram (11 starters per team with `U-23` / `Foreign` badges, yellow `Doubtful` badges + `Backup: <Name>` sub-labels for 50/50 players, and a cited "Sidelined / Unavailable" strip).
-     - **`PeerComparisonCard`**: Adaptive visual that renders **Head-to-Head Comparison Bars** for `2` players or a **2D Scatter Quadrant** (encoding U-23 vs. Senior and Local vs. Foreign) for `>= 3` players.
+  2. **6 Editorial Visual Report Templates (Inline in AI Chat + Interactive in `/studio`)** with **1-Click Export PNG (`Editorial Dark #0F172A` or `Transparent Clean`)**:
+     - **`TeamStyleProfileCard`**: 24-metric Playing Style (*In Possession* & *Out of Possession*) and Performance (*Attack* & *Defence*) matrix across `All`, `Home`, `Away`, and `Last 6`, auto-extracted **Strengths & Weaknesses**, **Dominant Formations**, and **Key Players** (*Top Threats* & *Top Creators*).
+     - **`TeamScatterCard`**: Club 2D X/Y Tactical Percentile Matrix across any pair of the 24 team metrics.
+     - **`PlayerScoutingCard`**: Customizable 22-metric percentile bars (`0–100`), per-90 & possession-adjusted (`PAdj`) metrics, two-season evolution deltas (`25/26` → `26/27`), and `Early Season Sample` badges (`180–449` mins).
+     - **`PrematchLineupCard`**: Side-by-side pitch formation diagram (11 starters per team with `U-23` / `Foreign` badges, Coral `50/50 Doubtful` badges + `Backup: <Name>` sub-labels, and cited Sidelined strip).
+     - **`PeerComparisonCard`**: 2D Scouting Quadrant across any X/Y player metrics with U-23, Local/Foreign, and Focal Player encoding.
+     - **`PlayerRankingCard`**: Custom Metric Leaderboard (`Top 10 / 15 / 20`) filtered by position, age band, nationality quota, and minimum minutes.
 
 ---
 
@@ -74,7 +78,7 @@ PostgreSQL holds the historical match numbers, while **Hybrid RAG (`halfspace` s
 
 | Role | Server Name | Transport | Tools & Capabilities |
 | :--- | :--- | :--- | :--- |
-| **MCP Producer** *(Server we build)* | `liga1-intelligence-mcp` (`packages/mcp-server`) | `stdio` & `HTTP` (`/mcp`) | Exposes 3 goal-oriented tools + 1 guarded ad-hoc SQL fallback over our read-only PostgreSQL database:<br>1. `scout_players(position, season, age_group, nationality, min_minutes, style_focus)`<br>2. `get_prematch_context(home_team, away_team, season)`<br>3. `get_player_report_data(player_name, season_a, season_b)`<br>4. `query_liga1_readonly_sql(sql_query)` *(guarded `SELECT`-only fallback with `3000ms` timeout & `LIMIT 50` for unique follow-ups)* |
+| **MCP Producer** *(Server we build)* | `liga1-intelligence-mcp` (`packages/mcp-server`) | `stdio` & `HTTP` (`/mcp`) | Exposes 4 goal-oriented tools + 1 guarded ad-hoc SQL fallback over our read-only PostgreSQL database (8 leagues / 23 seasons):<br>1. `get_team_style_profile(team_name, league, season)` *(24-metric Style & Performance matrix, Strengths/Weaknesses, Key Players)*<br>2. `scout_players(position, league, season, age_group, nationality, min_minutes, style_focus)`<br>3. `get_prematch_context(home_team, away_team, season)`<br>4. `get_player_report_data(player_name, league, season_a, season_b)`<br>5. `query_liga1_readonly_sql(sql_query)` *(guarded `SELECT`-only fallback with timeout & `LIMIT 50` for unique follow-ups)* |
 | **MCP Consumer** *(Servers our app uses)* | 1. `liga1-intelligence-mcp`<br>2. External **Tavily / Fetch Web MCP Server** (`tavily-mcp` / `@modelcontextprotocol/server-fetch`) | MCP Client inside `packages/agents` | Our Anvia backend connects as an **MCP Client** to both our own `liga1-intelligence-mcp` server and an external **Web Search / Fetch MCP Server** for breaking matchday updates hours before kickoff. |
 
 ---
