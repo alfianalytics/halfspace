@@ -9,6 +9,7 @@
     "dev:web": "pnpm --filter @halfspace/web dev",
     "studio": "pnpm --filter @halfspace/agents studio",
     "eval": "pnpm --filter @halfspace/agents eval",
+    "test:e2e": "pnpm --filter @halfspace/api exec tsx ../../scripts/e2e-verify.ts",
     "mcp:stdio": "pnpm --filter @halfspace/mcp-server start:stdio",
     "mcp:http": "pnpm --filter @halfspace/mcp-server start:http",
     "sync:news": "pnpm --filter @halfspace/agents sync:news",

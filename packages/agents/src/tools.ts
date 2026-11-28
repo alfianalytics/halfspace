@@ -16,6 +16,16 @@ import "dotenv/config";
 import { validateVisualCardPayload } from "./workflow-news-sync.js";
 
 /**
+ * Ensures every tool result is a strict JSON value (no `undefined`, `Date`, `BigInt`, or non-plain objects),
+ * which `@anvia/core` strictly requires for tool outputs.
+ */
+function toStrictJson<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? Number(v) : v)),
+  ) as T;
+}
+
+/**
  * 1. RAG Search Tool: News, Liga 1 Regulations, and Tactical Methodology
  */
 export const searchLiga1KnowledgeRagTool = createTool({
@@ -32,19 +42,19 @@ export const searchLiga1KnowledgeRagTool = createTool({
   }),
   execute: async ({ query, category, club }) => {
     const docs = await searchRagDocuments({ query, category: category ?? "all", club, limit: 5 });
-    return {
+    return toStrictJson({
       retrievedCount: docs.length,
       documents: docs.map((d) => ({
         docId: d.docId,
         citationTag: `[${d.docId}]`,
         title: d.title,
         category: d.category,
-        club: d.club,
+        club: d.club ?? null,
         publishedDate: d.publishedDate,
         sourceUrl: d.sourceUrl,
         content: d.content,
       })),
-    };
+    });
   },
 });
 
@@ -74,10 +84,10 @@ export const scoutPlayersTool = createTool({
   execute: async (args) => {
     const result = await scoutLiga1Players(args);
     const validatedCard = validateVisualCardPayload("peer_comparison", result.comparisonCard);
-    return {
+    return toStrictJson({
       ...result,
       visualCard: validatedCard,
-    };
+    });
   },
 });
 
@@ -103,11 +113,11 @@ export const getPrematchContextTool = createTool({
   execute: async (args) => {
     const result = await getPrematchContext(args);
     const validatedCard = validateVisualCardPayload("prematch_lineup", result.prematchCard);
-    return {
-      upcomingFixture: result.upcomingFixture,
+    return toStrictJson({
+      upcomingFixture: result.upcomingFixture ?? null,
       visualCard: validatedCard,
       relevantNewsAndRules: result.relevantNewsAndRules,
-    };
+    });
   },
 });
 
@@ -132,10 +142,10 @@ export const getUpcomingFixturesTool = createTool({
       teamName: args.teamName,
       limit: args.limit ?? 8,
     });
-    return {
+    return toStrictJson({
       count: fixtures.length,
       fixtures,
-    };
+    });
   },
 });
 
@@ -158,13 +168,13 @@ export const getPlayerReportDataTool = createTool({
   execute: async (args) => {
     const result = await getPlayerReportData(args);
     if (!result.found || !result.card) {
-      return result;
+      return toStrictJson(result);
     }
     const validatedCard = validateVisualCardPayload("player_scouting", result.card);
-    return {
+    return toStrictJson({
       found: true,
       visualCard: validatedCard,
-    };
+    });
   },
 });
 
@@ -182,10 +192,10 @@ export const queryLiga1ReadonlySqlTool = createTool({
     const cleaned = sqlQuery.trim().replace(/;+$/, "");
     const withLimit = /\bLIMIT\s+\d+/i.test(cleaned) ? cleaned : `${cleaned} LIMIT 50`;
     const rows = await queryReadOnly(withLimit, [], 8000);
-    return {
+    return toStrictJson({
       rowCount: rows.length,
       rows,
-    };
+    });
   },
 });
 
@@ -233,11 +243,11 @@ export const rememberUserFactTool = createTool({
   execute: async ({ key, fact }) => {
     const saved = await saveUserMemoryFact(key, fact);
     const allFacts = await loadUserMemoryFacts();
-    return {
+    return toStrictJson({
       saved,
       totalRememberedFacts: allFacts.length,
       allFacts,
-    };
+    });
   },
 });
 
@@ -259,13 +269,13 @@ export const getTeamStyleProfileTool = createTool({
   execute: async (args) => {
     const result = await getTeamStyleProfile(args);
     if (!result.found || !result.card) {
-      return result;
+      return toStrictJson(result);
     }
     const validatedCard = validateVisualCardPayload("team_style_profile", result.card);
-    return {
+    return toStrictJson({
       found: true,
       visualCard: validatedCard,
-    };
+    });
   },
 });
 
