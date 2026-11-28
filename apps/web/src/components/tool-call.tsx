@@ -4,6 +4,7 @@ import {
   AlertCircle,
   BarChart3,
   BookOpen,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -26,6 +27,7 @@ import {
 function getToolIcon(toolName: string) {
   if (toolName === "scout_players") return <Users className="w-3.5 h-3.5 text-[#6EE7B7]" />;
   if (toolName === "get_prematch_context") return <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />;
+  if (toolName === "get_upcoming_fixtures") return <Calendar className="w-3.5 h-3.5 text-[#6EE7B7]" />;
   if (toolName === "get_player_report_data") return <Database className="w-3.5 h-3.5 text-[#6EE7B7]" />;
   if (toolName === "get_team_style_profile") return <BarChart3 className="w-3.5 h-3.5 text-[#6EE7B7]" />;
   if (toolName === "search_liga1_knowledge_rag") return <BookOpen className="w-3.5 h-3.5 text-[#38BDF8]" />;
@@ -37,6 +39,7 @@ function getToolIcon(toolName: string) {
 function getToolLabel(toolName: string) {
   if (toolName === "scout_players") return "PostgreSQL MCP · Player Scouting & Peer Quadrant";
   if (toolName === "get_prematch_context") return "PostgreSQL + RAG MCP · Pre-Match & Predicted XI";
+  if (toolName === "get_upcoming_fixtures") return "PostgreSQL MCP · Upcoming Matchweek Schedule";
   if (toolName === "get_player_report_data") return "PostgreSQL MCP · Player Scouting & 2-Season Evolution";
   if (toolName === "get_team_style_profile")
     return "PostgreSQL MCP · Team Style, Strengths/Weaknesses & Key Players";

@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, ArrowUpRight, Calendar, Send, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Calendar, Loader2, Send, SlidersHorizontal } from "lucide-react";
 import { newSessionId, setPendingMessage } from "../lib/pending-message";
 
 const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -11,19 +11,28 @@ type FixtureItem = {
   awayTeam: string;
   round: number;
   scoreLabel: string;
+  leagueName?: string;
 };
 
-async function loadFixtures(): Promise<FixtureItem[]> {
+const SLATE_LEAGUES = [
+  { key: "Liga 1", label: "LIGA 1" },
+  { key: "Premier League", label: "EPL" },
+  { key: "LaLiga", label: "LALIGA" },
+  { key: "Serie A", label: "SERIE A" },
+  { key: "UEFA Champions League", label: "UCL" },
+] as const;
+
+async function loadFixtures(league = "Liga 1"): Promise<FixtureItem[]> {
   try {
-    const res = await fetch(`${baseUrl}/api/fixtures`);
+    const res = await fetch(`${baseUrl}/api/fixtures?league=${encodeURIComponent(league)}&limit=6`);
     if (!res.ok) return [];
     const data = (await res.json()) as { fixtures: FixtureItem[] };
     return data.fixtures ?? [];
   } catch {
     return [
-      { matchId: 1, homeTeam: "Persib Bandung", awayTeam: "Persija Jakarta", round: 12, scoreLabel: "Upcoming" },
-      { matchId: 2, homeTeam: "Persebaya Surabaya", awayTeam: "Borneo FC", round: 12, scoreLabel: "Upcoming" },
-      { matchId: 3, homeTeam: "Bali United", awayTeam: "PSM Makassar", round: 12, scoreLabel: "Upcoming" },
+      { matchId: 1, homeTeam: "Persita Tangerang", awayTeam: "Persib Bandung", round: 11, scoreLabel: "29 Nov • 15:30 WIB" },
+      { matchId: 2, homeTeam: "Arema FC", awayTeam: "Persebaya Surabaya", round: 11, scoreLabel: "29 Nov • 15:30 WIB" },
+      { matchId: 3, homeTeam: "Bali United FC", awayTeam: "PSM Makassar", round: 12, scoreLabel: "04 Dec • 15:30 WIB" },
     ];
   }
 }
@@ -61,9 +70,29 @@ const INSPIRATION_PROMPTS = [
 ];
 
 function Home() {
-  const fixtures = Route.useLoaderData();
+  const initialFixtures = Route.useLoaderData();
+  const [slateLeague, setSlateLeague] = useState<string>("Liga 1");
+  const [fixtures, setFixtures] = useState<FixtureItem[]>(initialFixtures);
+  const [loadingSlate, setLoadingSlate] = useState(false);
   const [input, setInput] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (slateLeague === "Liga 1" && initialFixtures.length > 0 && fixtures === initialFixtures) {
+      return;
+    }
+    let cancelled = false;
+    setLoadingSlate(true);
+    void loadFixtures(slateLeague).then((rows) => {
+      if (!cancelled) {
+        setFixtures(rows);
+        setLoadingSlate(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slateLeague]);
 
   function startConversation(text: string) {
     const message = text.trim();
@@ -248,49 +277,72 @@ function Home() {
             </div>
           </div>
 
-          {/* Matchweek Slate */}
+          {/* Matchweek Slate (Powered by sofascore.fact_upcoming_match) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-[#334155] pb-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#334155] pb-2.5">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-[#6EE7B7]" />
                 <span className="font-tech text-xs uppercase tracking-wider font-bold text-[#F8FAFC]">
-                  Matchweek Slate · Liga 1
+                  Upcoming Matchweek Slate
                 </span>
               </div>
-              <span className="font-tech text-[10px] text-[#6EE7B7] border border-[#334155] px-2 py-0.5">
-                UPCOMING FIRST
-              </span>
+
+              <div className="inline-flex border border-[#334155] bg-[#0F172A] p-0.5 font-tech text-[9px]">
+                {SLATE_LEAGUES.map((lg) => (
+                  <button
+                    key={lg.key}
+                    type="button"
+                    onClick={() => setSlateLeague(lg.key)}
+                    className={`px-1.5 py-0.5 transition-colors cursor-pointer ${
+                      slateLeague === lg.key
+                        ? "bg-[#6EE7B7] text-[#0F172A] font-bold"
+                        : "text-[#94A3B8] hover:text-[#F8FAFC]"
+                    }`}
+                  >
+                    {lg.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="divide-y divide-[#334155]">
-              {fixtures.slice(0, 6).map((f) => (
-                <button
-                  key={`${f.matchId}-${f.homeTeam}`}
-                  type="button"
-                  onClick={() =>
-                    startConversation(
-                      `Analisis prematch ${f.homeTeam} vs ${f.awayTeam} dan prediksi Starting XI kedua tim berdasarkan gaya main, performa terakhir, berita cedera/akumulasi kartu di RAG, serta aturan kuota U-23.`,
-                    )
-                  }
-                  className="w-full py-3 flex items-center justify-between gap-3 text-left hover:bg-[#1E293B]/50 px-2 -mx-2 transition-colors cursor-pointer group"
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-[#F8FAFC] group-hover:text-[#6EE7B7] transition-colors truncate">
-                      {f.homeTeam} <span className="text-[#64748B] font-normal">vs</span> {f.awayTeam}
+            {loadingSlate ? (
+              <div className="py-10 flex items-center justify-center gap-2 font-tech text-xs text-[#38BDF8]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                LOADING UPCOMING MATCHES...
+              </div>
+            ) : (
+              <div className="divide-y divide-[#334155]">
+                {fixtures.slice(0, 6).map((f) => (
+                  <button
+                    key={`${f.matchId}-${f.homeTeam}`}
+                    type="button"
+                    onClick={() =>
+                      startConversation(
+                        slateLeague === "Liga 1"
+                          ? `Analisis prematch ${f.homeTeam} vs ${f.awayTeam} (Pekan ${f.round}, ${f.scoreLabel}) dan prediksi Starting XI kedua tim berdasarkan gaya main, performa terakhir, berita cedera/akumulasi kartu di RAG, serta aturan kuota U-23.`
+                          : `Analisis prematch ${f.homeTeam} vs ${f.awayTeam} di ${slateLeague} (Round ${f.round}, ${f.scoreLabel}) dan prediksi Starting XI serta perbandingan gaya main kedua tim.`,
+                      )
+                    }
+                    className="w-full py-3 flex items-center justify-between gap-3 text-left hover:bg-[#1E293B]/50 px-2 -mx-2 transition-colors cursor-pointer group"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#F8FAFC] group-hover:text-[#6EE7B7] transition-colors truncate">
+                        {f.homeTeam} <span className="text-[#64748B] font-normal">vs</span> {f.awayTeam}
+                      </div>
+                      <div className="font-tech text-[10px] text-[#94A3B8] mt-0.5 flex items-center gap-2">
+                        <span>{slateLeague === "Liga 1" ? `PEKAN ${f.round}` : `ROUND ${f.round}`}</span>
+                        <span>•</span>
+                        <span className="text-[#38BDF8]">{f.scoreLabel}</span>
+                      </div>
                     </div>
-                    <div className="font-tech text-[10px] text-[#94A3B8] mt-0.5 flex items-center gap-2">
-                      <span>PEKAN {f.round}</span>
-                      <span>•</span>
-                      <span className="text-[#38BDF8]">{f.scoreLabel}</span>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center gap-1 font-tech text-[10px] px-2 py-1 border border-[#334155] group-hover:border-[#6EE7B7] text-[#CBD5E1] group-hover:text-[#6EE7B7] shrink-0 transition-colors">
-                    Brief XI
-                    <ArrowRight className="w-3 h-3" />
-                  </span>
-                </button>
-              ))}
-            </div>
+                    <span className="inline-flex items-center gap-1 font-tech text-[10px] px-2 py-1 border border-[#334155] group-hover:border-[#6EE7B7] text-[#CBD5E1] group-hover:text-[#6EE7B7] shrink-0 transition-colors">
+                      Brief XI
+                      <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Multi-League Dossiers */}

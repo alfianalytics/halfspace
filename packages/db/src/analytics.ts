@@ -698,6 +698,7 @@ async function buildTeamPrematchBlock(
   seasonKey: string,
   seasonId: number,
   cohort: RawAggregatedPlayer[],
+  tournamentId = LIGA1_TOURNAMENT_ID,
 ): Promise<z.infer<typeof TeamPrematchBlockSchema>> {
   // Find matching team in dim_team / fact_team_x_match_stats
   const teamRows = await queryReadOnly(
@@ -724,11 +725,12 @@ async function buildTeamPrematchBlock(
     ORDER BY matches DESC
     LIMIT 1;
     `,
-    [LIGA1_TOURNAMENT_ID, seasonId, `%${teamQuery.toLowerCase().trim()}%`],
+    [tournamentId, seasonId, `%${teamQuery.toLowerCase().trim()}%`],
   );
 
   // Fallback to 25/26 if team has no rows in 26/27
   let tr = teamRows[0];
+  const prevSeasonId = resolveLeagueAndSeason(tournamentId, "25/26").seasonId;
   let effectiveSeasonId = seasonId;
   if (!tr) {
     const fallbackRows = await queryReadOnly(
@@ -749,16 +751,16 @@ async function buildTeamPrematchBlock(
       FROM sofascore.fact_team_x_match_stats ts
       JOIN sofascore.dim_team t ON t.team_id = ts.team_id
       WHERE ts.tournament_id = $1
-        AND ts.season_id = 78590
-        AND LOWER(t.team_name) LIKE $2
+        AND ts.season_id = $2
+        AND LOWER(t.team_name) LIKE $3
       GROUP BY t.team_id, t.team_name, t.team_primary_color
       ORDER BY matches DESC
       LIMIT 1;
       `,
-      [LIGA1_TOURNAMENT_ID, `%${teamQuery.toLowerCase().trim()}%`],
+      [tournamentId, prevSeasonId, `%${teamQuery.toLowerCase().trim()}%`],
     );
     tr = fallbackRows[0];
-    effectiveSeasonId = 78590;
+    effectiveSeasonId = prevSeasonId;
   }
 
   const teamId = Number(tr?.team_id ?? 0);
@@ -1012,23 +1014,111 @@ async function buildTeamPrematchBlock(
 
 /**
  * Tool 3: Pre-Match Tactical Analysis & Starting XI Prediction
+ * Automatically resolves upcoming opponent & kickoff time from `sofascore.fact_upcoming_match` when available!
  */
 export async function getPrematchContext(input: {
   homeTeam: string;
-  awayTeam: string;
+  awayTeam?: string;
+  league?: string;
   season?: string;
 }): Promise<{
   prematchCard: PrematchLineupCardData;
+  upcomingFixture?: {
+    matchId: number;
+    round: number;
+    kickoffWib: string;
+    tournamentName: string;
+  };
   relevantNewsAndRules: Array<{ docId: string; title: string; category: string; content: string; sourceUrl: string }>;
 }> {
-  const { seasonId, seasonKey } = resolveSeasonId(input.season ?? "26/27");
-  const cohort = await fetchSeasonPlayerCohort(seasonKey);
+  let resolvedHome = input.homeTeam;
+  let resolvedAway = input.awayTeam || "";
+  let resolvedLeagueInput: string | number | undefined = input.league;
+  let fixtureMeta: { matchId: number; round: number; kickoffWib: string } | undefined;
+
+  // Check `sofascore.fact_upcoming_match` to auto-resolve next opponent (if only 1 club passed) or enrich kickoff date/round
+  try {
+    if (!resolvedAway.trim()) {
+      const nextRows = await queryReadOnly(
+        `
+        SELECT
+          match_id,
+          tournament_id,
+          round,
+          home_team_name,
+          away_team_name,
+          TO_CHAR(match_datetime, 'DD Mon YYYY • HH24:MI') || ' WIB' AS kickoff_wib
+        FROM sofascore.fact_upcoming_match
+        WHERE COALESCE(status_type, 'notstarted') = 'notstarted'
+          AND match_datetime >= (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '4 hours'
+          AND (LOWER(home_team_name) LIKE $1 OR LOWER(away_team_name) LIKE $1)
+        ORDER BY match_datetime ASC
+        LIMIT 1;
+        `,
+        [`%${resolvedHome.toLowerCase().trim()}%`],
+      );
+      if (nextRows[0]) {
+        resolvedHome = String(nextRows[0].home_team_name);
+        resolvedAway = String(nextRows[0].away_team_name);
+        if (!resolvedLeagueInput) resolvedLeagueInput = Number(nextRows[0].tournament_id);
+        fixtureMeta = {
+          matchId: Number(nextRows[0].match_id),
+          round: Number(nextRows[0].round ?? 1),
+          kickoffWib: String(nextRows[0].kickoff_wib),
+        };
+      }
+    } else {
+      const pairRows = await queryReadOnly(
+        `
+        SELECT
+          match_id,
+          tournament_id,
+          round,
+          home_team_name,
+          away_team_name,
+          TO_CHAR(match_datetime, 'DD Mon YYYY • HH24:MI') || ' WIB' AS kickoff_wib
+        FROM sofascore.fact_upcoming_match
+        WHERE COALESCE(status_type, 'notstarted') = 'notstarted'
+          AND match_datetime >= (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '4 hours'
+          AND (
+            (LOWER(home_team_name) LIKE $1 AND LOWER(away_team_name) LIKE $2)
+            OR (LOWER(home_team_name) LIKE $2 AND LOWER(away_team_name) LIKE $1)
+          )
+        ORDER BY match_datetime ASC
+        LIMIT 1;
+        `,
+        [`%${resolvedHome.toLowerCase().trim()}%`, `%${resolvedAway.toLowerCase().trim()}%`],
+      );
+      if (pairRows[0]) {
+        resolvedHome = String(pairRows[0].home_team_name);
+        resolvedAway = String(pairRows[0].away_team_name);
+        if (!resolvedLeagueInput) resolvedLeagueInput = Number(pairRows[0].tournament_id);
+        fixtureMeta = {
+          matchId: Number(pairRows[0].match_id),
+          round: Number(pairRows[0].round ?? 1),
+          kickoffWib: String(pairRows[0].kickoff_wib),
+        };
+      }
+    }
+  } catch {
+    // ignore if table unavailable
+  }
+
+  if (!resolvedAway.trim()) {
+    resolvedAway = "Persija Jakarta";
+  }
+
+  const { tournamentId, tournamentName, seasonId, seasonKey } = resolveLeagueAndSeason(
+    resolvedLeagueInput,
+    input.season ?? "26/27",
+  );
+  const cohort = await fetchSeasonPlayerCohort(seasonKey, tournamentId);
 
   const [homeBlock, awayBlock, homeNews, awayNews, regDocs] = await Promise.all([
-    buildTeamPrematchBlock(input.homeTeam, seasonKey, seasonId, cohort),
-    buildTeamPrematchBlock(input.awayTeam, seasonKey, seasonId, cohort),
-    searchRagDocuments({ query: `${input.homeTeam} update skuad cedera starter`, club: input.homeTeam, limit: 2 }),
-    searchRagDocuments({ query: `${input.awayTeam} update skuad cedera starter`, club: input.awayTeam, limit: 2 }),
+    buildTeamPrematchBlock(resolvedHome, seasonKey, seasonId, cohort, tournamentId),
+    buildTeamPrematchBlock(resolvedAway, seasonKey, seasonId, cohort, tournamentId),
+    searchRagDocuments({ query: `${resolvedHome} update skuad cedera starter`, club: resolvedHome, limit: 2 }),
+    searchRagDocuments({ query: `${resolvedAway} update skuad cedera starter`, club: resolvedAway, limit: 2 }),
     searchRagDocuments({ query: "regulasi starter U-23 kuota pemain asing akumulasi kartu", category: "regulation", limit: 3 }),
   ]);
 
@@ -1037,13 +1127,19 @@ export async function getPrematchContext(input: {
 
   const keyMatchupNotes = [
     `${homeBlock.teamName} (${homeBlock.predictedFormation}, Form: ${homeBlock.recentForm}) averages ${homeBlock.stats.nonPenXgPerMatch} Non-Pen xG/match (${homeBlock.stats.openPlayXgPerMatch} Open-Play + ${homeBlock.stats.setPieceXgPerMatch} Set-Piece) vs ${awayBlock.teamName} (${awayBlock.predictedFormation}, Form: ${awayBlock.recentForm}) at ${awayBlock.stats.nonPenXgPerMatch} Non-Pen xG/match.`,
-    `Liga 1 Quota Verification [reg-liga1-u23-2627, reg-liga1-foreign-quota-2627]: ${homeBlock.teamName} starts ${homeBlock.quotaCheck.u23StartersCount} Local U-23 and ${homeBlock.quotaCheck.foreignStartersCount}/6 Foreign players; ${awayBlock.teamName} starts ${awayBlock.quotaCheck.u23StartersCount} Local U-23 and ${awayBlock.quotaCheck.foreignStartersCount}/6 Foreign players.`,
+    tournamentId === LIGA1_TOURNAMENT_ID
+      ? `Liga 1 Quota Verification [reg-liga1-u23-2627, reg-liga1-foreign-quota-2627]: ${homeBlock.teamName} starts ${homeBlock.quotaCheck.u23StartersCount} Local U-23 and ${homeBlock.quotaCheck.foreignStartersCount}/6 Foreign players; ${awayBlock.teamName} starts ${awayBlock.quotaCheck.u23StartersCount} Local U-23 and ${awayBlock.quotaCheck.foreignStartersCount}/6 Foreign players.`
+      : `${tournamentName} Matchweek Context: ${fixtureMeta ? `Round ${fixtureMeta.round} (${fixtureMeta.kickoffWib})` : `Season ${seasonKey}`}.`,
   ];
+
+  const matchLabel = fixtureMeta
+    ? `${homeBlock.teamName} vs ${awayBlock.teamName} — Pekan ${fixtureMeta.round} (${fixtureMeta.kickoffWib})`
+    : `${homeBlock.teamName} vs ${awayBlock.teamName} — ${tournamentName} ${seasonKey}`;
 
   const prematchCard: PrematchLineupCardData = {
     cardType: "prematch_lineup",
     season: seasonKey,
-    matchLabel: `${homeBlock.teamName} vs ${awayBlock.teamName} — Liga 1 ${seasonKey}`,
+    matchLabel,
     homeTeam: homeBlock,
     awayTeam: awayBlock,
     keyMatchupNotes,
@@ -1051,6 +1147,7 @@ export async function getPrematchContext(input: {
 
   return {
     prematchCard,
+    upcomingFixture: fixtureMeta ? { ...fixtureMeta, tournamentName } : undefined,
     relevantNewsAndRules: uniqueDocs.map((d) => ({
       docId: d.docId,
       title: d.title,
@@ -1062,37 +1159,84 @@ export async function getPrematchContext(input: {
 }
 
 /**
- * Fetch featured Liga 1 fixtures / big matches for the Home screen bar (`/`)
+ * Query upcoming matches from `sofascore.fact_upcoming_match` across all 7 active leagues or for a specific club.
  */
-export async function getFeaturedLiga1Fixtures(limit = 6) {
-  // 1. Primary source: `sofascore.fact_upcoming_match` (live upcoming matchweek schedule)
-  try {
-    const upcomingRows = await queryReadOnly(
-      `
-      SELECT
-        match_id,
-        TO_CHAR(match_datetime, 'DD Mon') || ' • ' || TO_CHAR(match_datetime, 'HH24:MI') || ' WIB' AS wib_label,
-        round,
-        home_team_name AS home_team,
-        away_team_name AS away_team
-      FROM sofascore.fact_upcoming_match
-      WHERE tournament_id = $1
-        AND COALESCE(status_type, 'notstarted') = 'notstarted'
-        AND match_datetime >= (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '4 hours'
-      ORDER BY match_datetime ASC
-      LIMIT $2;
-      `,
-      [LIGA1_TOURNAMENT_ID, limit],
-    );
+export async function getUpcomingFixtures(options?: {
+  league?: string | number;
+  teamName?: string;
+  limit?: number;
+}) {
+  const limit = Math.min(30, Math.max(1, options?.limit ?? 8));
+  const resolved = options?.league ? resolveLeagueAndSeason(options.league, "26/27") : undefined;
 
-    if (upcomingRows.length > 0) {
-      return upcomingRows.map((r) => ({
-        matchId: Number(r.match_id),
-        homeTeam: String(r.home_team),
-        awayTeam: String(r.away_team),
-        round: Number(r.round ?? 1),
-        scoreLabel: String(r.wib_label || "UPCOMING"),
-      }));
+  const whereParts = [
+    "COALESCE(u.status_type, 'notstarted') = 'notstarted'",
+    "u.match_datetime >= (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '4 hours'",
+  ];
+  const params: any[] = [];
+
+  if (resolved && !options?.teamName) {
+    params.push(resolved.tournamentId);
+    whereParts.push(`u.tournament_id = $${params.length}`);
+  } else if (options?.league && options?.teamName) {
+    params.push(resolved!.tournamentId);
+    whereParts.push(`u.tournament_id = $${params.length}`);
+  }
+
+  if (options?.teamName && options.teamName.trim()) {
+    params.push(`%${options.teamName.toLowerCase().trim()}%`);
+    whereParts.push(
+      `(LOWER(u.home_team_name) LIKE $${params.length} OR LOWER(u.away_team_name) LIKE $${params.length})`,
+    );
+  }
+
+  params.push(limit);
+  const rows = await queryReadOnly(
+    `
+    SELECT
+      u.match_id,
+      u.tournament_id,
+      u.season_id,
+      u.round,
+      u.home_team_id,
+      u.home_team_name,
+      u.away_team_id,
+      u.away_team_name,
+      u.status_type,
+      TO_CHAR(u.match_datetime, 'DD Mon') || ' • ' || TO_CHAR(u.match_datetime, 'HH24:MI') || ' WIB' AS wib_short,
+      TO_CHAR(u.match_datetime, 'YYYY-MM-DD HH24:MI') || ' WIB' AS kickoff_wib
+    FROM sofascore.fact_upcoming_match u
+    WHERE ${whereParts.join(" AND ")}
+    ORDER BY u.match_datetime ASC
+    LIMIT $${params.length};
+    `,
+    params,
+  );
+
+  return rows.map((r) => {
+    const tInfo = resolveLeagueAndSeason(Number(r.tournament_id), "26/27");
+    return {
+      matchId: Number(r.match_id),
+      tournamentId: Number(r.tournament_id),
+      leagueName: tInfo.tournamentName,
+      round: Number(r.round ?? 1),
+      homeTeam: String(r.home_team_name),
+      awayTeam: String(r.away_team_name),
+      kickoffWib: String(r.kickoff_wib),
+      scoreLabel: String(r.wib_short || "UPCOMING"),
+    };
+  });
+}
+
+/**
+ * Fetch featured fixtures for the Home screen Matchweek Slate (`/`)
+ */
+export async function getFeaturedLiga1Fixtures(limit = 6, leagueInput?: string | number) {
+  const targetLeague = leagueInput ?? LIGA1_TOURNAMENT_ID;
+  try {
+    const upcoming = await getUpcomingFixtures({ league: targetLeague, limit });
+    if (upcoming.length > 0) {
+      return upcoming;
     }
   } catch {
     // Fallback to fact_match below if fact_upcoming_match unavailable

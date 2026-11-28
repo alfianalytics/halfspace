@@ -3,6 +3,7 @@ import {
   getPlayerReportData,
   getPrematchContext,
   getTeamStyleProfile,
+  getUpcomingFixtures,
   loadUserMemoryFacts,
   queryReadOnly,
   saveUserMemoryFact,
@@ -81,23 +82,59 @@ export const scoutPlayersTool = createTool({
 });
 
 /**
- * 3. Pre-Match Analysis & Starting XI Prediction Tool (PostgreSQL + RAG News/Rules + PrematchLineupCard Visual Payload)
+ * 3. Pre-Match Analysis & Starting XI Prediction Tool (PostgreSQL + fact_upcoming_match + RAG News/Rules)
  */
 export const getPrematchContextTool = createTool({
   name: "get_prematch_context",
   description:
-    "Run a complete Pre-Match Tactical Analysis & Starting XI Prediction for two Liga 1 clubs. Combines PostgreSQL recent form, formations, xG splits, and card counts with Hybrid RAG injury/suspension news (Confirmed Out vs 50/50 Doubtful with named backups) and PSSI/LIB U-23 & Foreign player quota verification. Returns a validated `visualCard` (`prematch_lineup`) that renders the Pitch Formation Board in the chat.",
+    "Run a complete Pre-Match Tactical Analysis & Starting XI Prediction. Combines PostgreSQL recent form, formations, xG splits, and card counts with Hybrid RAG injury/suspension news (Confirmed Out vs 50/50 Doubtful with named backups) and U-23 & Foreign player quota verification. If `awayTeam` is omitted (e.g. user asks 'Analisis next match Persib'), it automatically looks up the next scheduled opponent & WIB kickoff time in `sofascore.fact_upcoming_match`! Returns a validated `visualCard` (`prematch_lineup`).",
   inputSchema: z.object({
-    homeTeam: z.string().describe("Home club name, e.g. Persib Bandung"),
-    awayTeam: z.string().describe("Away club name, e.g. Persija Jakarta"),
+    homeTeam: z.string().describe("Club name (or home club), e.g. Persib Bandung, Persija Jakarta, Arsenal"),
+    awayTeam: z
+      .string()
+      .optional()
+      .describe("Optional away club name. Omit to automatically resolve `homeTeam`'s next opponent from `sofascore.fact_upcoming_match`."),
+    league: z
+      .string()
+      .optional()
+      .describe("Optional league: 'Liga 1', 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
     season: z.string().optional().describe("Season: 26/27 (default) or 25/26"),
   }),
   execute: async (args) => {
     const result = await getPrematchContext(args);
     const validatedCard = validateVisualCardPayload("prematch_lineup", result.prematchCard);
     return {
+      upcomingFixture: result.upcomingFixture,
       visualCard: validatedCard,
       relevantNewsAndRules: result.relevantNewsAndRules,
+    };
+  },
+});
+
+/**
+ * 3b. Upcoming Matchweek Fixtures Tool (`sofascore.fact_upcoming_match`)
+ */
+export const getUpcomingFixturesTool = createTool({
+  name: "get_upcoming_fixtures",
+  description:
+    "Fetch upcoming scheduled football matches (round, home/away clubs, and exact WIB kickoff time) from `sofascore.fact_upcoming_match` across Liga 1, Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, and UEFA Champions League, or for a specific club (e.g. 'Persib lawan siapa next match?', 'Jadwal Liga 1 minggu ini').",
+  inputSchema: z.object({
+    league: z
+      .string()
+      .optional()
+      .describe("League name: 'Liga 1', 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
+    teamName: z.string().optional().describe("Optional club name filter, e.g. 'Persib Bandung', 'Persija', 'Arsenal'"),
+    limit: z.number().optional().describe("Number of upcoming fixtures to return (default 8)"),
+  }),
+  execute: async (args) => {
+    const fixtures = await getUpcomingFixtures({
+      league: args.league ?? (args.teamName ? undefined : "Liga 1"),
+      teamName: args.teamName,
+      limit: args.limit ?? 8,
+    });
+    return {
+      count: fixtures.length,
+      fixtures,
     };
   },
 });
@@ -235,6 +272,7 @@ export const getTeamStyleProfileTool = createTool({
 export const HALFSPACE_TOOLS = [
   scoutPlayersTool,
   getPrematchContextTool,
+  getUpcomingFixturesTool,
   getPlayerReportDataTool,
   getTeamStyleProfileTool,
   searchLiga1KnowledgeRagTool,

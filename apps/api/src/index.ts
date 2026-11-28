@@ -65,9 +65,11 @@ app.get("/api/models", (c) =>
   }),
 );
 
-// Live Liga 1 Fixtures Bar for Home Screen (`/`)
+// Live Upcoming Fixtures Bar for Home Screen (`/`) — powered by `sofascore.fact_upcoming_match`
 app.get("/api/fixtures", async (c) => {
-  const fixtures = await getFeaturedLiga1Fixtures(6);
+  const league = c.req.query("league") || "Liga 1";
+  const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 6;
+  const fixtures = await getFeaturedLiga1Fixtures(limit, league);
   return c.json({ fixtures });
 });
 

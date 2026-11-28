@@ -2,6 +2,7 @@ import {
   getPlayerReportData,
   getPrematchContext,
   getTeamStyleProfile,
+  getUpcomingFixtures,
   queryReadOnly,
   scoutLiga1Players,
 } from "@halfspace/db";
@@ -55,10 +56,11 @@ export function createLiga1McpServer() {
     {
       title: "Get Pre-Match Tactical Analysis & Predicted Starting XI Context",
       description:
-        "Fetch pre-match tactical profile, recent 5-match form, Open-Play vs Set-Piece xG splits, predicted Starting XI formation, disciplinary card counts, and RAG-backed injury/suspension/doubtful (50/50) availability plus Liga 1 U-23 & Foreign player quota checks for two Liga 1 clubs.",
+        "Fetch pre-match tactical profile, recent 5-match form, Open-Play vs Set-Piece xG splits, predicted Starting XI formation, disciplinary card counts, and RAG-backed injury/suspension/doubtful (50/50) availability plus Liga 1 U-23 & Foreign player quota checks. If `awayTeam` is omitted, automatically looks up `homeTeam`'s next scheduled opponent & WIB kickoff time in `sofascore.fact_upcoming_match`.",
       inputSchema: z.object({
-        homeTeam: z.string().describe("Home club name, e.g. Persib Bandung"),
-        awayTeam: z.string().describe("Away club name, e.g. Persija Jakarta"),
+        homeTeam: z.string().describe("Club name (or home club), e.g. Persib Bandung, Persija Jakarta, Arsenal"),
+        awayTeam: z.string().optional().describe("Optional away club name; omit to auto-detect next scheduled opponent from fact_upcoming_match"),
+        league: z.string().optional().describe("Optional league: 'Liga 1', 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
         season: z.string().optional().describe("Season: 26/27 (default) or 25/26"),
       }),
     },
@@ -66,6 +68,34 @@ export function createLiga1McpServer() {
       const result = await getPrematchContext(args);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  // 2b. get_upcoming_fixtures
+  server.registerTool(
+    "get_upcoming_fixtures",
+    {
+      title: "Get Upcoming Matchweek Schedule (`sofascore.fact_upcoming_match`)",
+      description:
+        "Fetch real upcoming scheduled matches (round, home/away clubs, and WIB kickoff times) from `sofascore.fact_upcoming_match` across Liga 1, Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, or UEFA Champions League, optionally filtered by club name.",
+      inputSchema: z.object({
+        league: z
+          .string()
+          .optional()
+          .describe("League name: 'Liga 1' (default if teamName omitted), 'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UCL'"),
+        teamName: z.string().optional().describe("Optional club name filter, e.g. 'Persib', 'Persija', 'Arsenal'"),
+        limit: z.number().optional().describe("Max fixtures to return (default 8)"),
+      }),
+    },
+    async (args) => {
+      const fixtures = await getUpcomingFixtures({
+        league: args.league ?? (args.teamName ? undefined : "Liga 1"),
+        teamName: args.teamName,
+        limit: args.limit ?? 8,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify({ count: fixtures.length, fixtures }, null, 2) }],
       };
     },
   );
